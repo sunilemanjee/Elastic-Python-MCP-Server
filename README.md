@@ -2,6 +2,22 @@
 
 This is a Model Context Protocol (MCP) server implementation for Elasticsearch, designed to provide a standardized interface for interacting with Elasticsearch services.
 
+## Demo
+
+Watch a demo of this MCP server in action, integrated with Azure OpenAI and Elasticsearch:
+
+<iframe width="560" height="315" src="https://videos.elastic.co/embed/1qQtsuYSdeXGpvdhfYosnn" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
+This demo showcases:
+- Integration with Azure OpenAI for natural language processing
+- Elasticsearch for semantic search and property data storage
+- Real-time property search and recommendations
+- Location-based search capabilities
+
+Related repositories:
+- [Elastic Azure OpenAI MCP](https://github.com/sunilemanjee/Elastic_Azure_OpenAI_MCP/tree/main/mcp_aoai) - Azure OpenAI integration with Elasticsearch
+
+
 ## Prerequisites
 
 - Python 3.8 or higher
