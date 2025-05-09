@@ -79,9 +79,9 @@ Start the server using the provided script:
 ./run_server.sh
 ```
 
-The server will start on port 8000 by default. You can verify it's running by checking:
+The server will start on port 8001 by default. You can verify it's running by checking:
 ```bash
-curl -v http://localhost:8000/sse
+curl -v http://localhost:8001/sse
 ```
 
 ## Available Tools
