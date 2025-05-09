@@ -7,20 +7,23 @@ This is a Model Context Protocol (MCP) server implementation for Elasticsearch, 
 Watch a demo of this MCP server in action, integrated with Azure OpenAI and Elasticsearch:
 
 
-
 https://github.com/user-attachments/assets/8806b2dd-195a-4710-a962-96e74402697a
 
 
 
 
-
-
-
 This demo showcases:
+
+
+
+
 - Integration with Azure OpenAI for natural language processing
 - Elasticsearch for semantic search and property data storage
 - Real-time property search and recommendations
 - Location-based search capabilities
+
+Setup: 
+https://github.com/user-attachments/assets/86b649ca-dfe9-45d8-a89c-1cf9e40f5c5d
 
 Related repositories:
 - [Elastic AI Infused Property Search](https://github.com/sunilemanjee/Elastic-AI-Infused-Property-Search) - Azure OpenAI integration with Elasticsearch
