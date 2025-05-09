@@ -6,8 +6,23 @@ This is a Model Context Protocol (MCP) server implementation for Elasticsearch, 
 
 - Python 3.8 or higher
 - Node.js 16 or higher
-- Elasticsearch cluster with ELSER inference endpoint configured
+- Elasticsearch Serverless instance with:
+  - ELSER inference endpoint configured
+  - Properties index created
+  - Search template configured
 - Google Maps API key (for geocoding functionality)
+
+## Data Setup
+
+Before running the server, you need to:
+1. Create an Elasticsearch Serverless instance
+2. Configure the ELSER inference endpoint
+3. Create the properties index and search template
+
+You can use this [Colab notebook](https://colab.research.google.com/drive/1hy6XiWBrNiXMQvpjf-Bwd6FSd76aijPt?usp=sharing) to:
+- Ingest sample properties data
+- Create the required search template
+- Configure the ELSER inference endpoint
 
 ## Setup
 
@@ -32,7 +47,7 @@ nano env_config.sh  # or use your preferred editor
 ```
 
 Required environment variables:
-- `ES_URL`: Your Elasticsearch cluster URL
+- `ES_URL`: Your Elasticsearch Serverless URL
 - `ES_API_KEY`: Your Elasticsearch API key
 - `GOOGLE_MAPS_API_KEY`: Your Google Maps API key
 - `PROPERTIES_SEARCH_TEMPLATE`: Search template ID (default: "properties-search-template")
