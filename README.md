@@ -17,7 +17,7 @@ This demo showcases:
 - Location-based search capabilities
 
 Related repositories:
-- [Elastic Azure OpenAI MCP](https://github.com/sunilemanjee/Elastic_Azure_OpenAI_MCP/tree/main/mcp_aoai) - Azure OpenAI integration with Elasticsearch
+- [Elastic AI Infused Property Search](https://github.com/sunilemanjee/Elastic-AI-Infused-Property-Search) - Azure OpenAI integration with Elasticsearch
 
 ## Prerequisites
 
