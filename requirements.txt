@@ -1,0 +1,3 @@
+elasticsearch==8.17.0
+requests>=2.31.0
+mcp-python>=0.1.0 
