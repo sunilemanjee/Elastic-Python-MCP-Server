@@ -4,8 +4,9 @@ This is a Model Context Protocol (MCP) server implementation for Elasticsearch, 
 
 ## Demo
 
-https://github.com/user-attachments/assets/f3bffe11-9150-4d5d-a11f-692791c9b433
+Watch a demo of this MCP server in action, integrated with Azure OpenAI and Elasticsearch:
 
+https://videos.elastic.co/watch/1qQtsuYSdeXGpvdhfYosnn
 
 This demo showcases:
 - Integration with Azure OpenAI for natural language processing
@@ -15,7 +16,6 @@ This demo showcases:
 
 Related repositories:
 - [Elastic Azure OpenAI MCP](https://github.com/sunilemanjee/Elastic_Azure_OpenAI_MCP/tree/main/mcp_aoai) - Azure OpenAI integration with Elasticsearch
-
 
 ## Prerequisites
 
@@ -68,6 +68,7 @@ Required environment variables:
 - `PROPERTIES_SEARCH_TEMPLATE`: Search template ID (default: "properties-search-template")
 - `ELSER_INFERENCE_ID`: ELSER inference endpoint ID (default: ".elser-2-elasticsearch")
 - `ES_INDEX`: Elasticsearch index name (default: "properties")
+- `MCP_PORT`: Port number for the MCP server (default: 8000)
 
 ## Running the Server
 
@@ -76,9 +77,9 @@ Start the server using the provided script:
 ./run_server.sh
 ```
 
-The server will start on port 8001 by default. You can verify it's running by checking:
+The server will start on port 8000 by default. You can verify it's running by checking:
 ```bash
-curl -v http://localhost:8001/sse
+curl -v http://localhost:8000/sse
 ```
 
 ## Available Tools
