@@ -7,7 +7,13 @@ This is a Model Context Protocol (MCP) server implementation for Elasticsearch, 
 Watch a demo of this MCP server in action, integrated with Azure OpenAI and Elasticsearch:
 
 
-https://github.com/user-attachments/assets/2a1df2e2-cdc4-40c0-9dfb-9c1069b17e5e
+
+https://github.com/user-attachments/assets/8806b2dd-195a-4710-a962-96e74402697a
+
+
+
+
+
 
 
 This demo showcases:
