@@ -6,9 +6,6 @@ Watch a demo of the property search system in action:
 
 https://github.com/user-attachments/assets/df498631-fb16-4ba5-b1fd-c14670213d73
 
-
-
-
 ## Features
 
 - **Property Search**: Search for properties using various criteria including:
@@ -57,6 +54,7 @@ cd data-ingestion
    - Configure Elasticsearch
    - Download and ingest the property data
 
+
 ## Requirements
 
 - Python 3.x
@@ -91,7 +89,7 @@ cd data-ingestion
 
 ## Environment Variables
 
-The following environment variables need to be configured:
+The following environment variables need to be configured in `env_config.sh`:
 
 - `ES_URL`: Your Elasticsearch Serverless URL
 - `ES_API_KEY`: Your Elasticsearch API key
@@ -101,10 +99,37 @@ The following environment variables need to be configured:
 - `ES_INDEX`: Elasticsearch index name (default: "properties")
 - `MCP_PORT`: Port number for the MCP server (default: 8001)
 
+## Setup
+
+1. Create and configure your environment variables:
+```bash
+# Copy the template file
+cp env_config.template.sh env_config.sh
+
+# Edit env_config.sh with your credentials
+nano env_config.sh  # or use your preferred editor
+```
+
+2. Set up the Python virtual environment:
+```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate virtual environment
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+3. Source your environment variables:
+```bash
+source env_config.sh
+```
+
 ## Running the Server
 
-1. Set up your environment variables in `env_config.sh`
-2. Run the server:
+1. Run the server:
 ```bash
 ./run_server.sh
 ```
@@ -138,3 +163,4 @@ The search template supports the following parameters:
 ## License
 
 Copyright Elasticsearch B.V. and contributors
+SPDX-License-Identifier: Apache-2.0
