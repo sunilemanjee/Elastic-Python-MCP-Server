@@ -131,4 +131,3 @@ The search template supports the following parameters:
 ## License
 
 Copyright Elasticsearch B.V. and contributors
-SPDX-License-Identifier: Apache-2.0
