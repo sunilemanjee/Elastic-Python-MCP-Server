@@ -57,6 +57,31 @@ cd data-ingestion
 - Google Maps API key
 - Required Python packages (see requirements.txt)
 
+## Setting Up Required Services
+
+### Creating a Google Maps API Key
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Enable the following APIs:
+   - Geocoding API
+   - Maps JavaScript API
+4. Create credentials:
+   - Go to "APIs & Services" > "Credentials"
+   - Click "Create Credentials" > "API Key"
+   - Copy the generated API key
+5. (Optional) Restrict the API key to only the required APIs
+
+### Setting Up Elasticsearch Serverless
+
+1. Go to [Elastic Cloud](https://cloud.elastic.co/)
+2. Sign up or log in to your account
+3. Under "Serverless projects", select "Create serverless project"
+4. Choose your preferred cloud provider and region
+5. Click "Create deployment"
+6. Once created, within Kibana "Getting Started" you'll get an Elastic URL
+7. Create an API key with the required privileges (see [Data Ingestion README](data-ingestion/README.md) for details)
+
 ## Environment Variables
 
 The following environment variables need to be configured:
