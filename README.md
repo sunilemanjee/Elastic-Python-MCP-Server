@@ -1,89 +1,78 @@
 # Elasticsearch MCP Server
 
-This is a Model Context Protocol (MCP) server implementation for Elasticsearch, designed to provide a standardized interface for interacting with Elasticsearch services.
+This is a Python-based MCP (Model Control Protocol) server that provides an interface for searching and analyzing property data using Elasticsearch. The server was converted from a Jupyter notebook to a standalone Python script.
 
-## Demo
+## Features
 
-Watch a demo of this MCP server in action, integrated with Azure OpenAI and Elasticsearch:
+- **Property Search**: Search for properties using various criteria including:
+  - Location (with geocoding support)
+  - Price range
+  - Number of bedrooms/bathrooms
+  - Square footage
+  - Property features
+  - Tax and maintenance costs
 
+- **Geocoding Integration**: Uses Google Maps API to convert location strings into geographic coordinates
 
-https://github.com/user-attachments/assets/8806b2dd-195a-4710-a962-96e74402697a
+- **Elasticsearch Integration**: 
+  - Connects to Elasticsearch Serverless
+  - Uses ELSER (Elastic Learned Sparse Encoder) for semantic search
+  - Supports custom search templates
 
+## Project Structure
 
-
-
-This demo showcases:
-
-
-
-
-- Integration with Azure OpenAI for natural language processing
-- Elasticsearch for semantic search and property data storage
-- Real-time property search and recommendations
-- Location-based search capabilities
-
-Setup: 
-https://github.com/user-attachments/assets/86b649ca-dfe9-45d8-a89c-1cf9e40f5c5d
-
-Related repositories:
-- [Elastic AI Infused Property Search](https://github.com/sunilemanjee/Elastic-AI-Infused-Property-Search) - Azure OpenAI integration with Elasticsearch
-
-## Prerequisites
-
-- Python 3.8 or higher
-- Node.js 16 or higher
-- Elasticsearch Serverless instance with:
-  - ELSER inference endpoint configured
-  - Properties index created
-  - Search template configured
-- Google Maps API key (for geocoding functionality)
-
-## Data Setup
-
-Before running the server, you need to:
-1. Create an Elasticsearch Serverless instance
-2. Configure the ELSER inference endpoint
-3. Create the properties index and search template
-
-You can use this [Colab notebook](https://colab.research.google.com/drive/1hy6XiWBrNiXMQvpjf-Bwd6FSd76aijPt?usp=sharing) to:
-- Ingest sample properties data
-- Create the required search template
-- Configure the ELSER inference endpoint
-
-## Setup
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd Elastic-Python-MCP-Server
+```
+.
+├── data-ingestion/        # Scripts for setting up and populating Elasticsearch
+│   ├── data/             # Local data directory for property data
+│   ├── ingest-properties.py  # Main ingestion script
+│   ├── requirements.txt   # Python dependencies
+│   ├── setup.sh          # Setup script
+│   └── README.md         # Data ingestion documentation
+├── elastic_mcp_server.py  # Main MCP server
+├── env_config.sh         # Environment configuration
+├── env_config.template.sh # Environment configuration template
+├── requirements.txt      # Python dependencies
+└── README.md            # This file
 ```
 
-2. Set up the Python virtual environment:
+## Data Ingestion
+
+Before running the MCP server, you need to set up and populate your Elasticsearch instance with property data. This is handled by the scripts in the `data-ingestion` folder:
+
+1. Navigate to the data-ingestion directory:
 ```bash
-./setup_venv.sh
+cd data-ingestion
 ```
 
-3. Configure environment variables:
-```bash
-# Copy the template configuration file
-cp env_config.template.sh env_config.sh
+2. Follow the setup instructions in the [data-ingestion README](data-ingestion/README.md) to:
+   - Set up the Python environment
+   - Configure Elasticsearch
+   - Download and ingest the property data
 
-# Edit env_config.sh with your actual configuration values
-nano env_config.sh  # or use your preferred editor
-```
+## Requirements
 
-Required environment variables:
+- Python 3.x
+- Elasticsearch Serverless instance
+- Google Maps API key
+- Required Python packages (see requirements.txt)
+
+## Environment Variables
+
+The following environment variables need to be configured:
+
 - `ES_URL`: Your Elasticsearch Serverless URL
 - `ES_API_KEY`: Your Elasticsearch API key
 - `GOOGLE_MAPS_API_KEY`: Your Google Maps API key
 - `PROPERTIES_SEARCH_TEMPLATE`: Search template ID (default: "properties-search-template")
 - `ELSER_INFERENCE_ID`: ELSER inference endpoint ID (default: ".elser-2-elasticsearch")
 - `ES_INDEX`: Elasticsearch index name (default: "properties")
-- `MCP_PORT`: Port number for the MCP server (default: 8000)
+- `MCP_PORT`: Port number for the MCP server (default: 8001)
 
 ## Running the Server
 
-Start the server using the provided script:
+1. Set up your environment variables in `env_config.sh`
+2. Run the server:
 ```bash
 ./run_server.sh
 ```
@@ -93,18 +82,28 @@ The server will start on port 8001 by default. You can verify it's running by ch
 curl -v http://localhost:8001/sse
 ```
 
-## Available Tools
+## API Endpoints
 
-The server provides the following tools:
+The server provides several MCP tools:
 
-1. `get_properties_template_params`: Get required parameters for the properties search template
-2. `geocode_location`: Convert location strings to geo_points using Google Maps API
-3. `search_template`: Execute pre-defined Elasticsearch search templates with parameter normalization
+1. `get_properties_template_params`: Returns the required parameters for the properties search template
+2. `geocode_location`: Converts a location string into geographic coordinates
+3. `search_template`: Performs property searches using the configured search template
 
-## Security Note
+## Search Parameters
 
-The `env_config.sh` file contains sensitive configuration data and is excluded from version control. Always use the template file (`env_config.template.sh`) as a base and create your own local configuration.
+The search template supports the following parameters:
+- `query`: Main search query (mandatory)
+- `latitude`: Geographic latitude coordinate
+- `longitude`: Geographic longitude coordinate
+- `bathrooms`: Number of bathrooms
+- `tax`: Real estate tax amount
+- `maintenance`: Maintenance fee amount
+- `square_footage`: Property square footage
+- `home_price`: Maximum home price
+- `features`: Home features (e.g., *pool*updated kitchen*)
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
+Copyright Elasticsearch B.V. and contributors
+SPDX-License-Identifier: Apache-2.0

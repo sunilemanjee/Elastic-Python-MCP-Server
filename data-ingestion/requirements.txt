@@ -1,0 +1,5 @@
+elasticsearch==8.17.0
+openai
+streamlit
+requests
+python-dateutil 
