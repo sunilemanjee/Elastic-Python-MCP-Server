@@ -12,6 +12,8 @@ from typing import Dict, Any, Optional, List
 import requests
 from elasticsearch import Elasticsearch
 from mcp.server.fastmcp import FastMCP
+import asyncio
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(
@@ -75,21 +77,9 @@ def create_elasticsearch_mcp_server(config: ElasticsearchConfig) -> FastMCP:
         config.url,
         api_key=config.api_key,
         verify_certs=False,  # For demo purposes only
-        ssl_show_warn=False  # For demo purposes only
+        ssl_show_warn=False,  # For demo purposes only
+        request_timeout=300  # Add a 5-minute timeout
     )
-    
-    # Check inference endpoint if provided
-    if config.inference_id:
-        logger.info(f"Checking inference endpoint: {config.inference_id}")
-        try:
-            response = es_client.inference.inference(
-                inference_id=config.inference_id,
-                input=['wake up']
-            )
-            logger.info(f"Inference endpoint is ready: {config.inference_id}")
-        except Exception as e:
-            logger.error(f"Failed to connect to inference endpoint: {str(e)}")
-            logger.error(f"Inference endpoint {config.inference_id} is not available")
     
     # Create MCP server with port configuration
     port = int(os.getenv("MCP_PORT", "8000"))
@@ -98,6 +88,29 @@ def create_elasticsearch_mcp_server(config: ElasticsearchConfig) -> FastMCP:
         port=port,
         on_duplicate_tools="error"
     )
+
+    # Create a background task for checking inference endpoint
+    async def check_inference_endpoint():
+        """Periodically check if the inference endpoint is available."""
+        while True:
+            if config.inference_id:
+                logger.info(f"Checking inference endpoint: {config.inference_id}")
+                try:
+                    response = es_client.inference.inference(
+                        inference_id=config.inference_id,
+                        input=['wake up']
+                    )
+                    logger.info(f"Inference endpoint is ready: {config.inference_id}")
+                except Exception as e:
+                    logger.error(f"Failed to connect to inference endpoint: {str(e)}")
+                    logger.error(f"Inference endpoint {config.inference_id} is not available")
+            
+            # Wait for 5 minutes before next check
+            await asyncio.sleep(300)  # 300 seconds = 5 minutes
+
+    # Start the background task
+    loop = asyncio.get_event_loop()
+    loop.create_task(check_inference_endpoint())
     
     @mcp.tool()
     async def get_properties_template_params() -> Dict[str, Any]:
