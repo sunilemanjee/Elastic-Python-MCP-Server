@@ -101,6 +101,12 @@ The following environment variables need to be configured in `env_config.sh`:
 
 ## Setup
 
+1. Clone the repository:
+```bash
+git clone https://github.com/sunilemanjee/Elastic-Python-MCP-Server.git
+cd ELASTIC-PYTHON-MCP-SERVER
+```
+
 1. Create and configure your environment variables:
 ```bash
 # Copy the template file
