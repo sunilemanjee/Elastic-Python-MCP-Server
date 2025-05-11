@@ -107,7 +107,7 @@ git clone https://github.com/sunilemanjee/Elastic-Python-MCP-Server.git
 cd ELASTIC-PYTHON-MCP-SERVER
 ```
 
-1. Create and configure your environment variables:
+2. Create and configure your environment variables:
 ```bash
 # Copy the template file
 cp env_config.template.sh env_config.sh
@@ -116,7 +116,7 @@ cp env_config.template.sh env_config.sh
 nano env_config.sh  # or use your preferred editor
 ```
 
-2. Set up the Python virtual environment:
+3. Set up the Python virtual environment:
 ```bash
 # Create virtual environment
 python3 -m venv venv
@@ -128,7 +128,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-3. Source your environment variables:
+4. Source your environment variables:
 ```bash
 source env_config.sh
 ```
