@@ -55,6 +55,39 @@ cd data-ingestion
    - Download and ingest the property data
 
 
+## Make your API key Read Only
+
+The data ingestion section created a key with broader server privleges like creating indices and search template scripts.  You can further restrict that API key by editing the existing key's security privileges or making a new key with the following:
+
+```json
+{
+  "mcp_server_read_only": {
+    "cluster": [
+      "monitor"
+    ],
+    "indices": [
+      {
+        "names": [
+          "properties", "properties_raw"
+        ],
+        "privileges": [
+          "read",
+          "view_index_metadata"
+        ],
+        "allow_restricted_indices": false
+      }
+    ],
+    "applications": [],
+    "run_as": [],
+    "metadata": {},
+    "transient_metadata": {
+      "enabled": true
+    }
+  }
+}
+```
+
+
 ## Requirements
 
 - Python 3.x
@@ -104,10 +137,10 @@ The following environment variables need to be configured in `env_config.sh`:
 1. Clone the repository:
 ```bash
 git clone https://github.com/sunilemanjee/Elastic-Python-MCP-Server.git
-cd ELASTIC-PYTHON-MCP-SERVER
+cd Elastic-Python-MCP-Server
 ```
 
-2. Create and configure your environment variables:
+2. If you did not already in the data ingestion instructions, create and configure your environment variables:
 ```bash
 # Copy the template file
 cp env_config.template.sh env_config.sh

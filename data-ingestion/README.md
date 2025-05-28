@@ -40,19 +40,20 @@ data-ingestion/
 1. Create an Elasticsearch Serverless instance at [cloud.elastic.co](https://cloud.elastic.co/)
 2. Configure the API key with the following privileges:
 
+
 ```json
 {
-  "read-only-role": {
+  "ingestion": {
     "cluster": [
-      "manage"
+      "monitor", "manage"
     ],
     "indices": [
       {
         "names": [
-          "*"
+          "properties", "properties_raw"
         ],
         "privileges": [
-          "read"
+          "all"
         ],
         "allow_restricted_indices": false
       }
@@ -67,9 +68,11 @@ data-ingestion/
 }
 ```
 
-> **Note**: This API key configuration is for demo purposes only. In a production environment, you should follow proper security practices and limit the privileges to only what's necessary.
+> **Note**: This API key configuration is for demo purposes only. In a production environment, you should follow proper security practices and limit the privileges to only what's necessary.  The main README in the source of this project has an example read-only setting to use after ingestion is complete.
 
 ## Setup
+
+From a commandline terminal inside the ```data-ingestion``` folder:
 
 1. Make the setup script executable:
 ```bash
@@ -91,7 +94,7 @@ This will:
 
 The script uses the environment variables from the parent folder's `env_config.sh`. You can either:
 
-1. Use the existing configuration:
+1. Use an existing configuration:
 ```bash
 source ../env_config.sh
 ```
