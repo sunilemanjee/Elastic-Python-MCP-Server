@@ -15,8 +15,8 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Elasticsearch Configurations
-ELASTIC_SERVERLESS_CLOUD_ID = os.getenv('ELASTIC_SERVERLESS_CLOUD_ID')
-ELASTIC_SERVERLESS_API_KEY = os.getenv('ELASTIC_SERVERLESS_API_KEY')
+ES_URL = os.getenv('ES_URL' ) ## expects full URL including scheme (http/https) and port (:443) 
+ES_API_KEY = os.getenv('ES_API_KEY')
 
 # Constants
 RAW_INDEX_NAME = "properties_raw"
@@ -27,7 +27,9 @@ PROPERTIES_FILE = os.path.join(DATA_DIR, "properties.json")
 ELSER_INFERENCE_ID = ".elser-2-elasticsearch"
 
 # Connect to Elasticsearch
-es = Elasticsearch(cloud_id=ELASTIC_SERVERLESS_CLOUD_ID, api_key=ELASTIC_SERVERLESS_API_KEY, request_timeout=300)
+if not ES_URL or not ES_API_KEY:
+    raise ValueError("ES_URL and ES_API_KEY environment variables must be set")
+es = Elasticsearch(hosts=[ES_URL], api_key=ES_API_KEY, request_timeout=300)
 es.info()
 
 def create_raw_index():
