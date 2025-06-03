@@ -239,7 +239,7 @@ search_template_content = {
                                         "match": {
                                             "property-features": {
                                                 "query": "{{feature}}",
-                                                "operator": "and"
+                                                "operator": "or"
                                             }
                                         }
                                     }
