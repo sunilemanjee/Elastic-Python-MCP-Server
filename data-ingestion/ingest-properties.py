@@ -234,17 +234,17 @@ search_template_content = {
                                     }
                                 }{{/home_price}}
                             ] {{#feature}} ,
-                            "should": [
+                                "should": [
                                     {
-                                    "wildcard": {
-                                        "property-features": {
-                                            "value": "{{feature}}",
-                                            "case_insensitive": true
+                                        "match": {
+                                            "property-features": {
+                                                "query": "{{feature}}",
+                                                "operator": "and"
+                                            }
                                         }
                                     }
-                                }
-                            ],
-                            "minimum_should_match": 1
+                                ],
+                                "minimum_should_match": 1
                             {{/feature}}
                         }
                     }
@@ -253,6 +253,8 @@ search_template_content = {
         }"""
     }
 }
+
+
 
 def delete_search_template(template_id):
     """Deletes the search template if it exists"""

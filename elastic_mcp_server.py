@@ -150,7 +150,7 @@ def create_elasticsearch_mcp_server(config: ElasticsearchConfig) -> FastMCP:
 - maintenance: Maintenance fee amount
 - square_footage: Property square footage
 - home_price: Max home price. Not a range, just a number
-- features: Home features such as AC, pool, updated kitches, etc. the features should be enclosed in *. For example features such as pool and updated kitchen should be formated as *pool*updated kitchen*"""}
+- features: Home features such as AC, pool, updated kitches, etc should be listed as a single string For example features such as pool and updated kitchen should be formated as pool updated kitchen"""}
                 ],
                 "data": {"parameters": parameters}
             }
