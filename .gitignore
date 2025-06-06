@@ -39,4 +39,7 @@ ENV/
 Thumbs.db 
 
 # Chainlit
-.chainlit/ 
+.chainlit/
+
+# Data Ingestion
+data-ingestion/search-properties.py 
