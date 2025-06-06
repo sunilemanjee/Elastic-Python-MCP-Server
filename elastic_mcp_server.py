@@ -149,7 +149,8 @@ def create_elasticsearch_mcp_server(config: ElasticsearchConfig) -> FastMCP:
 - tax: Real estate tax amount
 - maintenance: Maintenance fee amount
 - square_footage: Property square footage
-- home_price: Max home price. Not a range, just a number
+- home_price_min: Minimum home price.  If only a max home price is provided, set this to 0. otherwise, set this to the minimum home price specified by the user.
+- home_price_max: Maximum home price
 - features: Home features such as AC, pool, updated kitches, etc should be listed as a single string For example features such as pool and updated kitchen should be formated as pool updated kitchen"""}
                 ],
                 "data": {"parameters": parameters}
@@ -252,7 +253,8 @@ def create_elasticsearch_mcp_server(config: ElasticsearchConfig) -> FastMCP:
         distance: Optional[int] = None,
         tax: Optional[float] = None,
         bedrooms: Optional[int] = None,
-        home_price: Optional[float] = None,
+        home_price_min: Optional[float] = None,
+        home_price_max: Optional[float] = None,
         bathrooms: Optional[float] = None,
         square_footage: Optional[int] = None,
         feature: Optional[str] = None,
@@ -273,7 +275,8 @@ def create_elasticsearch_mcp_server(config: ElasticsearchConfig) -> FastMCP:
                 "distance": f"{distance}mi" if distance is not None else None,  # Append 'mi' to distance
                 "tax": tax,
                 "bedrooms": bedrooms,
-                "home_price": home_price,
+                "home_price_min": home_price_min,
+                "home_price_max": home_price_max,
                 "bathrooms": bathrooms,
                 "square_footage": square_footage,
                 "feature": feature,
