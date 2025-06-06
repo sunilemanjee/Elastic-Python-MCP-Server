@@ -42,14 +42,7 @@ https://github.com/user-attachments/assets/df498631-fb16-4ba5-b1fd-c14670213d73
 
 ## Data Ingestion
 
-Before running the MCP server, you need to set up and populate your Elasticsearch instance with property data. This is handled by the scripts in the `data-ingestion` folder:
-
-1. Navigate to the data-ingestion directory:
-```bash
-cd data-ingestion
-```
-
-2. Follow the setup instructions in the [data-ingestion README](data-ingestion/README.md) to:
+Before running the MCP server, you need to set up and populate your Elasticsearch instance with property data. This is handled by the scripts in the `data-ingestion` folder.  Follow the setup instructions in the [data-ingestion README](data-ingestion/README.md) to:
    - Set up the Python environment
    - Configure Elasticsearch
    - Download and ingest the property data
