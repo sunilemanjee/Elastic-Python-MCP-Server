@@ -226,26 +226,30 @@ search_template_content = {
                                         }
                                     }
                                 }{{/square_footage}}
-                                {{#home_price}}{{#distance}}{{^bedrooms}}{{^bathrooms}}{{^tax}}{{^maintenance}}{{^square_footage}},{{/square_footage}}{{/maintenance}}{{/tax}}{{/bathrooms}}{{/bedrooms}}{{/distance}}{{#bedrooms}}{{^bathrooms}}{{^tax}}{{^maintenance}}{{^square_footage}},{{/square_footage}}{{/maintenance}}{{/tax}}{{/bathrooms}}{{/bedrooms}}{{#bathrooms}}{{^tax}}{{^maintenance}}{{^square_footage}},{{/square_footage}}{{/maintenance}}{{/tax}}{{/bathrooms}}{{#tax}}{{^maintenance}}{{^square_footage}},{{/square_footage}}{{/maintenance}}{{/tax}}{{#maintenance}}{{^square_footage}},{{/square_footage}}{{/maintenance}}{{#square_footage}},{{/square_footage}}{
+                                {{#home_price_max}}{{#distance}}{{^bedrooms}}{{^bathrooms}}{{^tax}}{{^maintenance}}{{^square_footage}},{{/square_footage}}{{/maintenance}}{{/tax}}{{/bathrooms}}{{/bedrooms}}{{/distance}}{{#bedrooms}}{{^bathrooms}}{{^tax}}{{^maintenance}}{{^square_footage}},{{/square_footage}}{{/maintenance}}{{/tax}}{{/bathrooms}}{{/bedrooms}}{{#bathrooms}}{{^tax}}{{^maintenance}}{{^square_footage}},{{/square_footage}}{{/maintenance}}{{/tax}}{{/bathrooms}}{{#tax}}{{^maintenance}}{{^square_footage}},{{/square_footage}}{{/maintenance}}{{/tax}}{{#maintenance}}{{^square_footage}},{{/square_footage}}{{/maintenance}}{{#square_footage}},{{/square_footage}}{
                                     "range": {
                                         "home-price": {
-                                            "lte": {{home_price}}
+                                            "gte": {{#home_price_min}}{{home_price_min}}{{/home_price_min}}{{^home_price_min}}0{{/home_price_min}},
+                                            "lte": {{home_price_max}}
                                         }
                                     }
-                                }{{/home_price}}
-                            ] {{#feature}} ,
-                                "should": [
-                                    {
-                                        "match": {
-                                            "property-features": {
-                                                "query": "{{feature}}",
-                                                "operator": "or"
+                                }{{/home_price_max}}
+                                {{#feature}},{
+                                    "bool": {
+                                        "should": [
+                                            {
+                                                "match": {
+                                                    "property-features": {
+                                                        "query": "{{feature}}",
+                                                        "operator": "or"
+                                                    }
+                                                }
                                             }
-                                        }
+                                        ],
+                                        "minimum_should_match": 1
                                     }
-                                ],
-                                "minimum_should_match": 1
-                            {{/feature}}
+                                }{{/feature}}
+                            ]
                         }
                     }
                 }
