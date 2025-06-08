@@ -148,7 +148,8 @@ def create_elasticsearch_mcp_server(config: ElasticsearchConfig) -> FastMCP:
 - bathrooms: Number of bathrooms
 - tax: Real estate tax amount
 - maintenance: Maintenance fee amount
-- square_footage: Property square footage
+- square_footage_min: Minimum property square footage. If only a max square footage is provided, set this to 0. otherwise, set this to the minimum square footage specified by the user.
+- square_footage_max: Maximum property square footage
 - home_price_min: Minimum home price.  If only a max home price is provided, set this to 0. otherwise, set this to the minimum home price specified by the user.
 - home_price_max: Maximum home price
 - features: Home features such as AC, pool, updated kitches, etc should be listed as a single string For example features such as pool and updated kitchen should be formated as pool updated kitchen"""}
