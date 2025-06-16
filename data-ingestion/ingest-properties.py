@@ -29,8 +29,32 @@ ELSER_INFERENCE_ID = ".elser-2-elasticsearch"
 # Connect to Elasticsearch
 if not ES_URL or not ES_API_KEY:
     raise ValueError("ES_URL and ES_API_KEY environment variables must be set")
-es = Elasticsearch(hosts=[ES_URL], api_key=ES_API_KEY, request_timeout=300)
+es = Elasticsearch(
+    hosts=[ES_URL], 
+    api_key=ES_API_KEY, 
+    request_timeout=600,
+    retry_on_timeout=True,
+    max_retries=10
+)
 es.info()
+
+def check_elser_deployment():
+    """Check if ELSER is properly deployed by making a test inference call"""
+    try:
+        response = es.inference.inference(
+            inference_id=ELSER_INFERENCE_ID,
+            input=['wake up']
+        )
+        print("✅ ELSER is properly deployed and ready to use")
+        return True
+    except Exception as e:
+        print(f"❌ Error checking ELSER deployment: {e}")
+        print("Please ensure ELSER is properly deployed before proceeding")
+        return False
+
+# Check ELSER deployment before proceeding
+if not check_elser_deployment():
+    raise SystemExit("ELSER deployment check failed. Please deploy ELSER before proceeding.")
 
 def create_raw_index():
     mapping = {
@@ -325,6 +349,7 @@ def async_reindex_with_tracking():
             "source": {"index": RAW_INDEX_NAME},
             "dest": {"index": INDEX_NAME}
         },
+        size=200,
         wait_for_completion=False  # Run async
     )
 

@@ -145,6 +145,7 @@ def create_elasticsearch_mcp_server(config: ElasticsearchConfig) -> FastMCP:
                     {"type": "text", "text": """- query: Main search query (mandatory)
 - latitude: Geographic latitude coordinate
 - longitude: Geographic longitude coordinate
+- distance: Distance from the latitude/longitude in miles. If not provided, default to 25
 - bathrooms: Number of bathrooms
 - tax: Real estate tax amount
 - maintenance: Maintenance fee amount
@@ -262,15 +263,20 @@ def create_elasticsearch_mcp_server(config: ElasticsearchConfig) -> FastMCP:
         maintenance: Optional[float] = None
     ) -> Dict[str, Any]:
         """Execute a search template with the given parameters."""
+        
         try:
             index = os.getenv("ES_INDEX", "properties")
             template_id = "properties-search-template"  # Use the correct template ID
             logger.info(f"Using template ID: {template_id} for index: {index}")
             logger.info(f"Original user query: {original_query}")
             
-            # Create params dictionary from function arguments
+            # Set default distance if lat/long provided but distance not specified
+            if latitude is not None and longitude is not None and distance is None:
+                distance = '25'
+                logger.info(f"Setting distance default distance to 25")
+
             params = {
-                "query": query,
+                "query": original_query,
                 "latitude": latitude,
                 "longitude": longitude,
                 "distance": f"{distance}mi" if distance is not None else None,  # Append 'mi' to distance
