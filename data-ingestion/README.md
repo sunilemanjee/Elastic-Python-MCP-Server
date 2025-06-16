@@ -19,6 +19,7 @@ data-ingestion/
 ├── ingest-properties.py   # Main ingestion script
 ├── requirements.txt       # Python dependencies
 ├── setup.sh              # Setup script
+├── run-ingestion.sh      # Script to run ingestion and update README
 └── README.md             # This file
 ```
 
@@ -136,7 +137,19 @@ The script creates the `properties` index with the following features:
 source venv/bin/activate
 ```
 
-3. Run the ingestion script:
+3. Run the ingestion script using the provided shell script:
+```bash
+./run-ingestion.sh
+```
+
+This script will:
+- Activate the virtual environment
+- Source the environment variables
+- Run the Python ingestion script
+- Update this README with the execution timestamp
+- Deactivate the virtual environment
+
+Alternatively, you can run the Python script directly:
 ```bash
 python ingest-properties.py
 ```
