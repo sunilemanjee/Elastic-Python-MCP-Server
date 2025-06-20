@@ -329,7 +329,7 @@ def download_and_parallel_bulk_load():
         es,
         actions=generate_actions(),
         thread_count=4,
-        chunk_size=200,
+        chunk_size=500,
         request_timeout=60
     ):
         if ok:
