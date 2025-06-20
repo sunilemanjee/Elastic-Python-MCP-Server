@@ -127,6 +127,16 @@ The following environment variables need to be configured in `env_config.sh`:
 
 ## Setup
 
+### Option 1: Docker Setup
+
+For a containerized setup using Docker, see the [Docker Setup Guide](DOCKER.md) for detailed instructions on:
+- Setting up environment variables
+- Running with Docker Compose
+- Production deployment options
+- Container management commands
+
+### Option 2: Manual Setup
+
 1. Clone the repository:
 ```bash
 git clone https://github.com/sunilemanjee/Elastic-Python-MCP-Server.git

@@ -83,9 +83,11 @@ def create_elasticsearch_mcp_server(config: ElasticsearchConfig) -> FastMCP:
     
     # Create MCP server with port configuration
     port = int(os.getenv("MCP_PORT", "8000"))
+    host = os.getenv("MCP_HOST", "0.0.0.0")
     mcp = FastMCP(
         name="elasticsearch-mcp-server",
         port=port,
+        host=host,
         on_duplicate_tools="error"
     )
 

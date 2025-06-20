@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  elastic-mcp-server:
+    build: .
+    ports:
+      - "8001:8001"
+    environment:
+      # Elasticsearch configuration
+      - ES_URL=${ES_URL}
+      - ES_API_KEY=${ES_API_KEY}
+      - ES_USERNAME=${ES_USERNAME:-}
+      - ES_PASSWORD=${ES_PASSWORD:-}
+      - ES_CA_CERT=${ES_CA_CERT:-}
+      
+      # Google Maps API
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      
+      # Search configuration
+      - PROPERTIES_SEARCH_TEMPLATE=${PROPERTIES_SEARCH_TEMPLATE:-properties-search-template}
+      - ELSER_INFERENCE_ID=${ELSER_INFERENCE_ID:-.elser-2-elasticsearch}
+      - ES_INDEX=${ES_INDEX:-properties}
+      
+      # Server configuration
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8001
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/sse"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - mcp-network
+
+networks:
+  mcp-network:
+    driver: bridge 

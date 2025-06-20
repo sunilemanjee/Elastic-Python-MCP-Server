@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+.env
+
+# Documentation
+*.md
+!README.md
+
+# Data ingestion (not needed for runtime)
+data-ingestion/
+
+# Shell scripts (not needed in container)
+*.sh
+
+# Environment configs (will be passed as env vars)
+env_config.sh
+env_config.template.sh
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db 
