@@ -1,61 +1,93 @@
-# Property Data Ingestion Script
+# Property Data Ingestion
 
-This script sets up the property index and loads property data into an existing Elasticsearch instance for the intelligent property search demo.
+This script loads property data into Elasticsearch for the intelligent property search demo with advanced capabilities for data processing and semantic search.
 
-## Overview
+## What This Does
 
-The script performs the following tasks:
-1. Creates and configures the Elasticsearch property index
-2. Downloads property data from a remote source
-3. Creates search templates for property queries
-4. Loads the data into the configured index
+1. **Creates** Elasticsearch indices with proper mappings (raw and processed)
+2. **Downloads** property data from a remote source
+3. **Sets up** search templates for property queries
+4. **Processes** data with ELSER for semantic search capabilities
+5. **Provides** modular operations for different use cases
 
-## Directory Structure
+## Quick Start
 
-```
-data-ingestion/
-├── data/                  # Local data directory for property data
-│   └── properties.json    # Downloaded property data
-├── ingest-properties.py   # Main ingestion script
-├── requirements.txt       # Python dependencies
-├── setup.sh              # Setup script
-├── run-ingestion.sh      # Script to run ingestion and update README
-└── README.md             # This file
-```
-
-## Prerequisites
-
+### Prerequisites
 - Python 3.x
-- An existing Elasticsearch Serverless instance
-- Required Python packages (installed automatically by setup script):
-  - elasticsearch==8.17.0
-  - openai
-  - streamlit
-  - requests
-  - python-dateutil
+- Elasticsearch Serverless instance (see setup below)
 
-## Elasticsearch Configuration
+### Setup & Run
 
-### Setting Up Elasticsearch Serverless
+1. **Make setup script executable:**
+   ```bash
+   chmod +x setup.sh
+   ```
 
-1. Create an Elasticsearch Serverless instance at [cloud.elastic.co](https://cloud.elastic.co/)
-2. Configure the API key with the following privileges:
+2. **Run setup:**
+   ```bash
+   ./setup.sh
+   ```
 
+3. **Run ingestion (choose your option):**
+   ```bash
+   # Run everything (default)
+   ./run-ingestion.sh
+   
+   # Or run specific operations
+   ./run-ingestion.sh --full-ingestion    # Complete pipeline
+   ./run-ingestion.sh --searchtemplate    # Only create search templates
+   ./run-ingestion.sh --reindex           # Only reindex (requires raw index)
+   ./run-ingestion.sh --recreate-index    # Recreate index without processing
+   ```
+
+## Command Line Options
+
+The ingestion script supports several operation modes:
+
+### `--searchtemplate`
+- Only creates/updates search templates
+- Useful for template development and testing
+- Fastest operation
+
+### `--full-ingestion`
+- Runs the complete data ingestion pipeline
+- Creates indices, downloads data, processes with ELSER
+- Most comprehensive operation
+
+### `--reindex`
+- Only performs reindexing from raw to processed index
+- Requires existing raw index
+- Useful for reprocessing data with ELSER
+
+### `--recreate-index`
+- Deletes and recreates the properties index
+- Downloads and loads data without ELSER processing
+- Useful for testing or when ELSER is not available
+
+### Multiple Operations
+You can combine flags to run multiple operations:
+```bash
+./run-ingestion.sh --searchtemplate --full-ingestion
+./run-ingestion.sh --full-ingestion --reindex
+```
+
+## Elasticsearch Setup
+
+### 1. Create Elasticsearch Serverless Instance
+- Go to [cloud.elastic.co](https://cloud.elastic.co/)
+- Create a new Serverless instance
+
+### 2. Create API Key
+Create an API key with these privileges:
 
 ```json
 {
   "ingestion": {
-    "cluster": [
-      "monitor", "manage"
-    ],
+    "cluster": ["monitor", "manage"],
     "indices": [
       {
-        "names": [
-          "properties", "properties_raw"
-        ],
-        "privileges": [
-          "all"
-        ],
+        "names": ["properties", "properties_raw"],
+        "privileges": ["all"],
         "allow_restricted_indices": false
       }
     ],
@@ -69,96 +101,158 @@ data-ingestion/
 }
 ```
 
-> **Note**: This API key configuration is for demo purposes only. In a production environment, you should follow proper security practices and limit the privileges to only what's necessary.  The main README in the source of this project has an example read-only setting to use after ingestion is complete.
+> **Security Note**: This configuration is for demo purposes. For production, use minimal required privileges. See the main project README for read-only settings after ingestion.
 
-## Setup
+### 3. Configure Environment
+Copy the template and add your credentials:
 
-From a commandline terminal inside the ```data-ingestion``` folder:
-
-1. Make the setup script executable:
-```bash
-chmod +x setup.sh
-```
-
-2. Run the setup script:
-```bash
-./setup.sh
-```
-
-This will:
-- Create a Python virtual environment
-- Install all required dependencies
-- Source the environment variables from the parent directory
-- Create the local data directory structure
-
-## Configuration
-
-The script uses the environment variables from the parent folder's `env_config.sh`. You can either:
-
-1. Use an existing configuration:
-```bash
-source ../env_config.sh
-```
-
-2. Or create a new configuration by copying the template:
 ```bash
 cp ../env_config.template.sh ../env_config.sh
-# Edit env_config.sh with your credentials
-source ../env_config.sh
+# Edit env_config.sh with your ES_URL and ES_API_KEY
 ```
 
-Required environment variables:
+Required variables:
 - `ES_URL`: Your Elasticsearch Serverless URL
 - `ES_API_KEY`: Your Elasticsearch API key
-- `PROPERTIES_SEARCH_TEMPLATE`: Search template ID (default: "properties-search-template")
-- `ELSER_INFERENCE_ID`: ELSER inference endpoint ID (default: ".elser-2-elasticsearch")
-- `ES_INDEX`: Elasticsearch index name (default: "properties")
 
-## Index Structure
+Optional variables (have defaults):
+- `PROPERTIES_SEARCH_TEMPLATE`: Search template ID
+- `ELSER_INFERENCE_ID`: ELSER inference endpoint ID  
+- `ES_INDEX`: Elasticsearch index name
 
-The script creates the `properties` index with the following features:
-- Semantic search capabilities using ELSER
+## Directory Structure
+
+```
+data-ingestion/
+├── data/                          # Downloaded property data
+├── ingest-properties.py           # Main ingestion script with CLI options
+├── requirements.txt               # Python dependencies
+├── setup.sh                      # Setup script
+├── run-ingestion.sh              # Run ingestion script with options
+├── search-template.mustache      # Search template definition
+├── raw-index-mapping.json        # Raw index mapping
+├── properties-index-mapping.json # Processed index mapping
+└── README.md                     # This file
+```
+
+## Manual Usage
+
+If you prefer to run manually:
+
+1. **Activate virtual environment:**
+   ```bash
+   source venv/bin/activate
+   ```
+
+2. **Source environment variables:**
+   ```bash
+   source ../env_config.sh
+   ```
+
+3. **Run the script with options:**
+   ```bash
+   # Run everything
+   python ingest-properties.py
+   
+   # Or specific operations
+   python ingest-properties.py --searchtemplate
+   python ingest-properties.py --full-ingestion
+   python ingest-properties.py --reindex
+   python ingest-properties.py --recreate-index
+   ```
+
+4. **Deactivate when done:**
+   ```bash
+   deactivate
+   ```
+
+## What Gets Created
+
+The script creates two indices:
+
+### `properties_raw`
+- Raw property data without processing
+- Used as source for ELSER processing
+- Cleaned up after successful processing
+
+### `properties`
+- Final processed index with ELSER semantic fields
 - Property-specific field mappings
-- Search template configuration
+- Search templates for queries
+- Ready for semantic search
 
-## Features
+## Advanced Features
 
-- Creates and configures the Elasticsearch property index with proper mappings
-- Downloads property data from a remote source
-- Sets up search templates for property queries
-- Configures ELSER (Elastic Learned Sparse Encoder) for semantic search
-- Handles bulk data ingestion with progress tracking
+### ELSER Integration
+- **Automatic deployment check** before processing
+- **Semantic field generation** for natural language search
+- **Retry logic** for reindex operations
+- **Progress tracking** during long operations
 
-## Usage
+### Performance Optimizations
+- **Parallel bulk indexing** with configurable thread count
+- **Chunked processing** to handle large datasets
+- **Async reindexing** with progress monitoring
+- **Error handling** and retry mechanisms
 
-1. Set up your environment variables using the parent folder's `env_config.sh`
-2. Activate the virtual environment:
-```bash
-source venv/bin/activate
-```
+### Data Quality
+- **JSON validation** during download
+- **Document count verification** after processing
+- **Automatic cleanup** of temporary data
 
-3. Run the ingestion script using the provided shell script:
-```bash
-./run-ingestion.sh
-```
+## Troubleshooting
 
-This script will:
-- Activate the virtual environment
-- Source the environment variables
-- Run the Python ingestion script
-- Update this README with the execution timestamp
-- Deactivate the virtual environment
+- **Permission errors**: Make sure `setup.sh` and `run-ingestion.sh` are executable
+- **Environment issues**: Verify `env_config.sh` exists and has correct credentials
+- **Elasticsearch connection**: Check your ES_URL and API key are correct
+- **ELSER deployment**: Ensure ELSER is properly deployed before running semantic processing
+- **Memory issues**: For large datasets, consider reducing chunk size in the script
 
-Alternatively, you can run the Python script directly:
-```bash
-python ingest-properties.py
-```
+## Dependencies
 
-4. When you're done, you can deactivate the virtual environment:
-```bash
-deactivate
-```
+The setup script automatically installs:
+- elasticsearch==8.17.0
+- openai
+- streamlit  
+- requests
+- python-dateutil
 
-## Note
+## Execution History
 
-This script was originally part of a Jupyter notebook and has been converted to a standalone Python script. It's designed to work with Elasticsearch Serverless and includes specific configurations for the property search demo. 
+The script automatically tracks execution history in this README:
+
+## Last Execution
+Last run: 2025-06-20 20:42:58
+
+## Last Reindex Operation
+Last run: 2025-06-20 21:02:29
+
+## Last Reindex Operation
+Last run: 2025-06-20 21:02:39
+
+## Last Reindex Operation
+Last run: 2025-06-20 21:04:35
+
+## Last Reindex Operation
+Last run: 2025-06-20 21:05:31
+
+## Last Reindex Operation
+Last run: 2025-06-21 04:28:09
+
+## Last Reindex Operation
+Last run: 2025-06-21 06:14:51
+
+## Last Reindex Operation
+Last run: 2025-06-21 06:24:58
+
+## Last Recreate Properties Index
+Last run: 2025-06-21 06:29:18
+
+## Last Recreate Properties Index
+Last run: 2025-06-21 06:29:34
+
+## Last Search Template Creation
+Last run: 2025-06-21 06:29:49
+
+## Last Search Template Creation
+Last run: 2025-06-21 06:36:45

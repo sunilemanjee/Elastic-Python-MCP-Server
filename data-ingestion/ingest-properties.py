@@ -2,6 +2,7 @@
 
 import os
 import json
+import argparse
 from openai import AzureOpenAI
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -9,6 +10,18 @@ from elasticsearch import Elasticsearch, helpers, NotFoundError
 from elasticsearch.helpers import scan, bulk
 import requests
 import time
+
+# Parse command line arguments
+parser = argparse.ArgumentParser(description='Property data ingestion script with ELSER semantic processing')
+parser.add_argument('--searchtemplate', action='store_true', 
+                   help='Only run the search template creation part')
+parser.add_argument('--full-ingestion', action='store_true', 
+                   help='Only run the complete data ingestion pipeline (create indices, download data, process with ELSER)')
+parser.add_argument('--reindex', action='store_true', 
+                   help='Only run the reindex operation (requires existing raw index)')
+parser.add_argument('--recreate-index', action='store_true', 
+                   help='Only delete and recreate the properties index (no data processing)')
+args = parser.parse_args()
 
 # Create data directory if it doesn't exist
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
@@ -25,6 +38,44 @@ TEMPLATE_ID = "properties-search-template"
 PROPERTIES_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties.json"
 PROPERTIES_FILE = os.path.join(DATA_DIR, "properties.json")
 ELSER_INFERENCE_ID = ".elser-2-elasticsearch"
+SEARCH_TEMPLATE_FILE = os.path.join(os.path.dirname(__file__), "search-template.mustache")
+RAW_INDEX_MAPPING_FILE = os.path.join(os.path.dirname(__file__), "raw-index-mapping.json")
+PROPERTIES_INDEX_MAPPING_FILE = os.path.join(os.path.dirname(__file__), "properties-index-mapping.json")
+TOTAL_NUMBER_DOCS = 48466
+
+# Load search template from external file
+def load_search_template():
+    """Load search template content from external file"""
+    try:
+        with open(SEARCH_TEMPLATE_FILE, 'r') as f:
+            template_source = f.read()
+        return {
+            "script": {
+                "lang": "mustache",
+                "source": template_source
+            }
+        }
+    except FileNotFoundError:
+        print(f"❌ Search template file not found: {SEARCH_TEMPLATE_FILE}")
+        raise
+
+# Load index mapping from external file
+def load_index_mapping(mapping_file):
+    """Load index mapping from external JSON file"""
+    try:
+        with open(mapping_file, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"❌ Index mapping file not found: {mapping_file}")
+        raise
+    except json.JSONDecodeError as e:
+        print(f"❌ Invalid JSON in mapping file {mapping_file}: {e}")
+        raise
+
+# Load the search template content
+search_template_content = load_search_template()
+
+print("🔧 Initializing Elasticsearch connection...")
 
 # Connect to Elasticsearch
 if not ES_URL or not ES_API_KEY:
@@ -37,10 +88,12 @@ es = Elasticsearch(
     max_retries=10
 )
 es.info()
+print("✅ Connected to Elasticsearch successfully")
 
 def check_elser_deployment():
     """Check if ELSER is properly deployed by making a test inference call"""
     try:
+        print("🔍 Checking ELSER deployment...")
         response = es.inference.inference(
             inference_id=ELSER_INFERENCE_ID,
             input=['wake up']
@@ -52,60 +105,9 @@ def check_elser_deployment():
         print("Please ensure ELSER is properly deployed before proceeding")
         return False
 
-# Check ELSER deployment before proceeding
-if not check_elser_deployment():
-    raise SystemExit("ELSER deployment check failed. Please deploy ELSER before proceeding.")
-
 def create_raw_index():
-    mapping = {
-      "mappings": {
-        "dynamic": "false",
-        "properties": {
-          "additional_urls": {"type": "keyword"},
-          "annual-tax": {"type": "integer"},
-          "body_content": {
-            "type": "text",
-            "copy_to": ["body_content_phrase"]
-          },
-          "body_content_phrase": {"type": "text"},
-          "domains": {"type": "keyword"},
-          "full_html": {"type": "text", "index": False},
-          "geo_point": {
-            "properties": {
-              "lat": {"type": "float"},
-              "lon": {"type": "float"}
-            }
-          },
-          "location": {"type": "geo_point"},
-          "headings": {"type": "text"},
-          "home-price": {"type": "integer"},
-          "id": {"type": "keyword"},
-          "last_crawled_at": {"type": "date"},
-          "latitude": {"type": "float"},
-          "links": {"type": "keyword"},
-          "listing-agent-info": {"type": "text"},
-          "longitude": {"type": "float"},
-          "maintenance-fee": {"type": "integer"},
-          "meta_description": {"type": "text"},
-          "meta_keywords": {"type": "keyword"},
-          "number-of-bathrooms": {"type": "float"},
-          "number-of-bedrooms": {"type": "float"},
-          "property-description": {"type": "text"},
-          "property-features": {"type": "text"},
-          "property-status": {"type": "keyword"},
-          "square-footage": {"type": "float"},
-          "title": {"type": "text"},
-          "url": {"type": "keyword"},
-          "url_host": {"type": "keyword"},
-          "url_path": {"type": "keyword"},
-          "url_path_dir1": {"type": "keyword"},
-          "url_path_dir2": {"type": "keyword"},
-          "url_path_dir3": {"type": "keyword"},
-          "url_port": {"type": "keyword"},
-          "url_scheme": {"type": "keyword"}
-        }
-      }
-    }
+    print(f"🏗️ Creating raw index '{RAW_INDEX_NAME}'...")
+    mapping = load_index_mapping(RAW_INDEX_MAPPING_FILE)
 
     if es.indices.exists(index=RAW_INDEX_NAME):
         es.indices.delete(index=RAW_INDEX_NAME)
@@ -114,66 +116,9 @@ def create_raw_index():
     es.indices.create(index=RAW_INDEX_NAME, body=mapping)
     print(f"✅ Index '{RAW_INDEX_NAME}' created.")
 
-create_raw_index()
-
 def create_properties_index():
-    mapping = {
-      "mappings": {
-        "dynamic": "false",
-        "properties": {
-          "additional_urls": {"type": "keyword"},
-          "annual-tax": {"type": "integer"},
-          "body_content": {
-            "type": "text",
-            "copy_to": [ "body_content_semantic"]
-          },
-          "body_content_semantic": {
-            "type": "semantic_text",
-            "inference_id": ELSER_INFERENCE_ID,
-            "model_settings": {
-              "task_type": "sparse_embedding"
-            }
-          },
-          "body_content_phrase": {"type": "text"},
-          "domains": {"type": "keyword"},
-          "full_html": {"type": "text", "index": False},
-          "geo_point": {
-            "properties": {
-              "lat": {"type": "float"},
-              "lon": {"type": "float"}
-            }
-          },
-          "location": {"type": "geo_point"},
-          "headings": {"type": "text"},
-          "home-price": {"type": "integer"},
-          "id": {"type": "keyword"},
-          "last_crawled_at": {"type": "date"},
-          "latitude": {"type": "float"},
-          "links": {"type": "keyword"},
-          "listing-agent-info": {"type": "text"},
-          "longitude": {"type": "float"},
-          "maintenance-fee": {"type": "integer"},
-          "meta_description": {"type": "text"},
-          "meta_keywords": {"type": "keyword"},
-          "number-of-bathrooms": {"type": "float"},
-          "number-of-bedrooms": {"type": "float"},
-          "property-description": {"type": "text"},
-          "property-features": {"type": "text"},
-          "property-status": {"type": "keyword"},
-          "square-footage": {"type": "float"},
-          "title": {"type": "text"},
-          "url": {"type": "keyword"},
-          "url_host": {"type": "keyword"},
-          "url_path": {"type": "keyword"},
-          "url_path_dir1": {"type": "keyword"},
-          "url_path_dir2": {"type": "keyword"},
-          "url_path_dir3": {"type": "keyword"},
-          "url_port": {"type": "keyword"},
-          "url_scheme": {"type": "keyword"}
-        }
-      }
-    }
-
+    print(f"🏗️ Creating properties index '{INDEX_NAME}' with ELSER semantic fields...")
+    mapping = load_index_mapping(PROPERTIES_INDEX_MAPPING_FILE)
 
     if es.indices.exists(index=INDEX_NAME):
         es.indices.delete(index=INDEX_NAME)
@@ -182,149 +127,42 @@ def create_properties_index():
     es.indices.create(index=INDEX_NAME, body=mapping)
     print(f"✅ Index '{INDEX_NAME}' created.")
 
-create_properties_index()
-
-"""##Search Template
-Removes the existing properties-search-template if present and replaces it with an updated version. This ensures the template is always current and correctly structured for search operations.
-"""
-
-search_template_content = {
-    "script": {
-        "lang": "mustache",
-        "source": """{
-            "_source": false,
-            "size": 5,
-            "fields": ["title", "annual-tax", "maintenance-fee", "number-of-bathrooms", "number-of-bedrooms", "square-footage", "home-price", "property-features"],
-            "retriever": {
-                "standard": {
-                    "query": {
-                        "semantic": {
-                            "field": "body_content_semantic",
-                            "query": "{{query}}"
-                        }
-                    },
-                    "filter": {
-                        "bool": {
-                            "must": [
-                                {{#distance}}{
-                                    "geo_distance": {
-                                        "distance": "{{distance}}",
-                                        "location": {
-                                            "lat": {{latitude}},
-                                            "lon": {{longitude}}
-                                        }
-                                    }
-                                }{{/distance}}
-                                {{#bedrooms}}{{#distance}},{{/distance}}{
-                                    "range": {
-                                        "number-of-bedrooms": {
-                                            "gte": {{bedrooms}}
-                                        }
-                                    }
-                                }{{/bedrooms}}
-                                {{#bathrooms}}{{#distance}}{{^bedrooms}},{{/bedrooms}}{{/distance}}{{#bedrooms}},{{/bedrooms}}{
-                                    "range": {
-                                        "number-of-bathrooms": {
-                                            "gte": {{bathrooms}}
-                                        }
-                                    }
-                                }{{/bathrooms}}
-                                {{#tax}}{{#distance}}{{^bedrooms}}{{^bathrooms}},{{/bathrooms}}{{/bedrooms}}{{/distance}}{{#bedrooms}}{{^bathrooms}},{{/bathrooms}}{{/bedrooms}}{{#bathrooms}},{{/bathrooms}}{
-                                    "range": {
-                                        "annual-tax": {
-                                            "lte": {{tax}}
-                                        }
-                                    }
-                                }{{/tax}}
-                                {{#maintenance}}{{#distance}}{{^bedrooms}}{{^bathrooms}}{{^tax}},{{/tax}}{{/bathrooms}}{{/bedrooms}}{{/distance}}{{#bedrooms}}{{^bathrooms}}{{^tax}},{{/tax}}{{/bathrooms}}{{/bedrooms}}{{#bathrooms}}{{^tax}},{{/tax}}{{/bathrooms}}{{#tax}},{{/tax}}{
-                                    "range": {
-                                        "maintenance-fee": {
-                                            "lte": {{maintenance}}
-                                        }
-                                    }
-                                }{{/maintenance}}
-                                {{#square_footage_max}}{{#distance}}{{^bedrooms}}{{^bathrooms}}{{^tax}}{{^maintenance}},{{/maintenance}}{{/tax}}{{/bathrooms}}{{/bedrooms}}{{/distance}}{{#bedrooms}}{{^bathrooms}}{{^tax}}{{^maintenance}},{{/maintenance}}{{/tax}}{{/bathrooms}}{{/bedrooms}}{{#bathrooms}}{{^tax}}{{^maintenance}},{{/maintenance}}{{/tax}}{{/bathrooms}}{{#tax}}{{^maintenance}},{{/maintenance}}{{/tax}}{{#maintenance}},{{/maintenance}}{
-                                    "range": {
-                                        "square-footage": {
-                                            "gte": {{#square_footage_min}}{{square_footage_min}}{{/square_footage_min}}{{^square_footage_min}}0{{/square_footage_min}},
-                                            "lte": {{square_footage_max}}
-                                        }
-                                    }
-                                }{{/square_footage_max}}
-                                {{#home_price_max}}{{#distance}}{{^bedrooms}}{{^bathrooms}}{{^tax}}{{^maintenance}}{{^square_footage}},{{/square_footage}}{{/maintenance}}{{/tax}}{{/bathrooms}}{{/bedrooms}}{{/distance}}{{#bedrooms}}{{^bathrooms}}{{^tax}}{{^maintenance}}{{^square_footage}},{{/square_footage}}{{/maintenance}}{{/tax}}{{/bathrooms}}{{/bedrooms}}{{#bathrooms}}{{^tax}}{{^maintenance}}{{^square_footage}},{{/square_footage}}{{/maintenance}}{{/tax}}{{/bathrooms}}{{#tax}}{{^maintenance}}{{^square_footage}},{{/square_footage}}{{/maintenance}}{{/tax}}{{#maintenance}}{{^square_footage}},{{/square_footage}}{{/maintenance}}{{#square_footage}},{{/square_footage}}{
-                                    "range": {
-                                        "home-price": {
-                                            "gte": {{#home_price_min}}{{home_price_min}}{{/home_price_min}}{{^home_price_min}}0{{/home_price_min}},
-                                            "lte": {{home_price_max}}
-                                        }
-                                    }
-                                }{{/home_price_max}}
-                                {{#feature}},{
-                                    "bool": {
-                                        "should": [
-                                            {
-                                                "match": {
-                                                    "property-features": {
-                                                        "query": "{{feature}}",
-                                                        "operator": "or"
-                                                    }
-                                                }
-                                            }
-                                        ],
-                                        "minimum_should_match": 1
-                                    }
-                                }{{/feature}}
-                            ]
-                        }
-                    }
-                }
-            }
-        }"""
-    }
-}
-
-
-
-def delete_search_template(template_id):
-    """Deletes the search template if it exists"""
-    try:
-        es.delete_script(id=template_id)
-        print(f"Deleted existing search template: {template_id}")
-    except Exception as e:
-        if "not_found" in str(e):
-            print(f"Search template '{template_id}' not found, skipping delete.")
-        else:
-            print(f"Error deleting template '{template_id}': {e}")
-
 
 def create_search_template(
     template_id=TEMPLATE_ID, template_content=search_template_content
 ):
     """Creates a new search template"""
+    print(f"📝 Creating search template '{template_id}'...")
     try:
         es.put_script(id=template_id, body=template_content)
-        print(f"Created search template: {template_id}")
+        print(f"✅ Created search template: {template_id}")
     except Exception as e:
-        print(f"Error creating template '{template_id}': {e}")
-
-create_search_template()
-
-"""## Ingest property data"""
+        print(f"❌ Error creating template '{template_id}': {e}")
 
 def download_and_parallel_bulk_load():
+    print(f"📥 Downloading property data from {PROPERTIES_URL}...")
     response = requests.get(PROPERTIES_URL, stream=True)
     response.raise_for_status()
+    print("✅ Data download started successfully")
 
     def generate_actions():
+        doc_count = 0
         for line in response.iter_lines():
             if line:
                 doc = json.loads(line.decode("utf-8"))
+                doc_count += 1
+                if doc_count % 1000 == 0:
+                    print(f"📊 Processed {doc_count} documents...")
                 yield {
                     "_index": RAW_INDEX_NAME,
                     "_source": doc
                 }
+        print(f"📊 Total documents to index: {doc_count}")
 
+    print("🚀 Starting parallel bulk indexing...")
     success_count = 0
+    error_count = 0
+    
     for ok, result in helpers.parallel_bulk(
         es,
         actions=generate_actions(),
@@ -334,45 +172,149 @@ def download_and_parallel_bulk_load():
     ):
         if ok:
             success_count += 1
+            if success_count % 1000 == 0:
+                print(f"✅ Successfully indexed {success_count} documents...")
+        else:
+            error_count += 1
+            if error_count % 100 == 0:
+                print(f"❌ Encountered {error_count} errors...")
 
     print(f"✅ Successfully indexed {success_count} documents into '{RAW_INDEX_NAME}' using parallel_bulk")
-
-
-download_and_parallel_bulk_load()
-
-"""## Reindex property data into target index which will also host elserized field"""
+    if error_count > 0:
+        print(f"⚠️ Encountered {error_count} errors during indexing")
 
 def async_reindex_with_tracking():
-    # Step 1: Start reindexing asynchronously
-    response = es.reindex(
-        body={
-            "source": {"index": RAW_INDEX_NAME},
-            "dest": {"index": INDEX_NAME}
-        },
-        size=200,
-        wait_for_completion=False  # Run async
-    )
+    max_retries = 2
+    retry_count = 0
+    
+    while retry_count <= max_retries:
+        print(f"🔄 Starting reindex from '{RAW_INDEX_NAME}' to '{INDEX_NAME}' with ELSER semantic processing...")
+        if retry_count > 0:
+            print(f"🔄 Retry attempt {retry_count}/{max_retries}")
+        
+        # Step 1: Start reindexing asynchronously
+        response = es.reindex(
+            body={
+                "source": {"index": RAW_INDEX_NAME, "size": 500 },
+                "dest": {"index": INDEX_NAME}
+            },
+            wait_for_completion=False  # Run async
+        )
 
-    task_id = response["task"]
-    print(f"🚀 Reindex started. Task ID: {task_id}")
+        task_id = response["task"]
+        print(f"🚀 Reindex started. Task ID: {task_id}")
 
-    # Step 2: Poll for completion
-    while True:
-        task_status = es.tasks.get(task_id=task_id)
-        completed = task_status.get("completed", False)
+        # Step 2: Poll for completion
+        start_time = time.time()
+        while True:
+            task_status = es.tasks.get(task_id=task_id)
+            completed = task_status.get("completed", False)
 
-        if completed:
-            stats = task_status["response"]
-            print(f"✅ Reindex complete! {stats['created']} docs reindexed, took {stats['took']}ms")
-            break
-        else:
-            print("⏳ Reindex in progress... checking again in 10 seconds.")
-            time.sleep(10)
+            if completed:
+                stats = task_status["response"]
+                elapsed_time = time.time() - start_time
+                print(f"✅ Reindex complete!")
+                print(f"   📊 {stats['created']} docs reindexed")
+                print(f"   ⏱️ Took {stats['took']}ms (wall time: {elapsed_time:.1f}s)")
+                print(f"   📈 Rate: {stats['created'] / (elapsed_time/60):.0f} docs/minute")
+                
+                # Check if we got the expected number of documents
+                if stats['created'] == TOTAL_NUMBER_DOCS:
+                    print(f"✅ Success! Expected {TOTAL_NUMBER_DOCS} documents were created.")
+                    return  # Success, exit the retry loop
+                else:
+                    print(f"❌ Expected {TOTAL_NUMBER_DOCS} documents, but only {stats['created']} were created.")
+                    if retry_count < max_retries:
+                        print(f"🗑️ Deleting destination index '{INDEX_NAME}' and retrying...")
+                        if es.indices.exists(index=INDEX_NAME):
+                            es.indices.delete(index=INDEX_NAME)
+                            print(f"🗑️ Index '{INDEX_NAME}' deleted.")
+                        retry_count += 1
+                        break  # Break out of the polling loop to retry
+                    else:
+                        print(f"❌ Max retries ({max_retries}) reached. Reindex failed to create expected number of documents.")
+                        raise Exception(f"Reindex failed: expected {TOTAL_NUMBER_DOCS} documents, got {stats['created']}")
+                break
+            else:
+                # Get progress info if available
+                if "status" in task_status:
+                    status = task_status["status"]
+                    if "total" in status and "updated" in status:
+                        total = status["total"]
+                        updated = status["updated"]
+                        if total > 0:
+                            progress = (updated / total) * 100
+                            print(f"⏳ Reindex progress: {progress:.1f}% ({updated}/{total})")
+                        else:
+                            print("⏳ Reindex in progress...")
+                    else:
+                        print("⏳ Reindex in progress...")
+                else:
+                    print("⏳ Reindex in progress...")
+                print("   Checking again in 10 seconds...")
+                time.sleep(10)
 
-async_reindex_with_tracking()
+def cleanup_raw_index():
+    print("🧹 Cleaning up temporary index...")
+    if es.indices.exists(index=RAW_INDEX_NAME):
+        es.indices.delete(index=RAW_INDEX_NAME)
+        print(f"🗑️ Index '{RAW_INDEX_NAME}' deleted.")
 
-"""## Clean up"""
+# Main execution logic based on command line arguments
+if __name__ == "__main__":
+    # Check ELSER deployment before proceeding (only if not just search template)
+    if not args.searchtemplate:
+        if not check_elser_deployment():
+            raise SystemExit("ELSER deployment check failed. Please deploy ELSER before proceeding.")
 
-if es.indices.exists(index=RAW_INDEX_NAME):
-    es.indices.delete(index=RAW_INDEX_NAME)
-    print(f"🗑️ Index '{RAW_INDEX_NAME}' deleted.")
+    # Track if any specific operations were run
+    operations_run = False
+
+    if args.searchtemplate:
+        print("🎯 Running search template creation...")
+        create_search_template()
+        print("✅ Search template creation complete!")
+        operations_run = True
+        
+    if args.full_ingestion:
+        print("🎯 Running complete data ingestion pipeline...")
+        create_raw_index()
+        create_properties_index()
+        create_search_template()
+        download_and_parallel_bulk_load()
+        async_reindex_with_tracking()
+        cleanup_raw_index()
+        print("✅ Complete data ingestion pipeline complete!")
+        print(f"📋 Final index '{INDEX_NAME}' is ready for semantic search with ELSER")
+        operations_run = True
+        
+    if args.reindex:
+        print("🎯 Running reindex operation...")
+        # Check if raw index exists
+        if not es.indices.exists(index=RAW_INDEX_NAME):
+            print(f"❌ Raw index '{RAW_INDEX_NAME}' does not exist. Please run with --full-ingestion first.")
+            exit(1)
+        async_reindex_with_tracking()
+        print("✅ Reindex operation complete!")
+        operations_run = True
+        
+    if args.recreate_index:
+        print("🎯 Running recreate index operation...")
+        create_raw_index()
+        create_properties_index()
+        download_and_parallel_bulk_load()
+        print("✅ Index recreation and data loading complete!")
+        operations_run = True
+        
+    # If no specific flags were provided, run everything
+    if not operations_run:
+        print("🎯 Running complete property data ingestion...")
+        # Run everything
+        create_raw_index()
+        create_properties_index()
+        create_search_template()
+        download_and_parallel_bulk_load()
+        async_reindex_with_tracking()
+        cleanup_raw_index()
+        print("🎉 Property data ingestion and processing complete!")
+        print(f"📋 Final index '{INDEX_NAME}' is ready for semantic search with ELSER")
