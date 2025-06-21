@@ -38,6 +38,7 @@ This script loads property data into Elasticsearch for the intelligent property 
    ./run-ingestion.sh --searchtemplate    # Only create search templates
    ./run-ingestion.sh --reindex           # Only reindex (requires raw index)
    ./run-ingestion.sh --recreate-index    # Recreate index without processing
+   ./run-ingestion.sh --use-small-dataset # Run everything with smaller dataset
    ```
 
 ## Command Line Options
@@ -64,11 +65,19 @@ The ingestion script supports several operation modes:
 - Downloads and loads data without ELSER processing
 - Useful for testing or when ELSER is not available
 
+### `--use-small-dataset`
+- Uses a smaller 5000-line dataset instead of the full 48,466-line dataset
+- Runs the complete data ingestion pipeline with reduced data volume
+- Useful for faster testing, development, and when full dataset is not needed
+- Can be combined with other flags for specific operations
+
 ### Multiple Operations
 You can combine flags to run multiple operations:
 ```bash
 ./run-ingestion.sh --searchtemplate --full-ingestion
 ./run-ingestion.sh --full-ingestion --reindex
+./run-ingestion.sh --full-ingestion --use-small-dataset
+./run-ingestion.sh --recreate-index --use-small-dataset
 ```
 
 ## Elasticsearch Setup
@@ -159,6 +168,7 @@ If you prefer to run manually:
    python ingest-properties.py --full-ingestion
    python ingest-properties.py --reindex
    python ingest-properties.py --recreate-index
+   python ingest-properties.py --use-small-dataset
    ```
 
 4. **Deactivate when done:**
@@ -180,6 +190,24 @@ The script creates two indices:
 - Property-specific field mappings
 - Search templates for queries
 - Ready for semantic search
+
+## Dataset Options
+
+The script supports two dataset sizes:
+
+### Full Dataset (Default)
+- **Source**: `properties.json` (48,466 documents)
+- **Use case**: Production and comprehensive testing
+- **Processing time**: Longer due to larger volume
+- **Command**: `./run-ingestion.sh` or `./run-ingestion.sh --full-ingestion`
+
+### Small Dataset
+- **Source**: `properties-filtered-5000-lines.json` (5,000 documents)
+- **Use case**: Development, testing, and quick validation
+- **Processing time**: Faster due to reduced volume
+- **Command**: `./run-ingestion.sh --use-small-dataset`
+
+Both datasets contain the same property data structure and are processed identically with ELSER semantic fields.
 
 ## Advanced Features
 
@@ -206,7 +234,7 @@ The script creates two indices:
 - **Environment issues**: Verify `env_config.sh` exists and has correct credentials
 - **Elasticsearch connection**: Check your ES_URL and API key are correct
 - **ELSER deployment**: Ensure ELSER is properly deployed before running semantic processing
-- **Memory issues**: For large datasets, consider reducing chunk size in the script
+- **Memory issues**: For large datasets, consider using `--use-small-dataset` or reducing chunk size in the script
 
 ## Dependencies
 

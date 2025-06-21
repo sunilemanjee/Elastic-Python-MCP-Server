@@ -21,6 +21,8 @@ parser.add_argument('--reindex', action='store_true',
                    help='Only run the reindex operation (requires existing raw index)')
 parser.add_argument('--recreate-index', action='store_true', 
                    help='Only delete and recreate the properties index (no data processing)')
+parser.add_argument('--use-small-dataset', action='store_true',
+                   help='Use the smaller 5000-line dataset instead of the full dataset')
 args = parser.parse_args()
 
 # Create data directory if it doesn't exist
@@ -36,12 +38,19 @@ RAW_INDEX_NAME = "properties_raw"
 INDEX_NAME = "properties"
 TEMPLATE_ID = "properties-search-template"
 PROPERTIES_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties.json"
+PROPERTIES_5000_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties-filtered-5000-lines.json"
 PROPERTIES_FILE = os.path.join(DATA_DIR, "properties.json")
 ELSER_INFERENCE_ID = ".elser-2-elasticsearch"
 SEARCH_TEMPLATE_FILE = os.path.join(os.path.dirname(__file__), "search-template.mustache")
 RAW_INDEX_MAPPING_FILE = os.path.join(os.path.dirname(__file__), "raw-index-mapping.json")
 PROPERTIES_INDEX_MAPPING_FILE = os.path.join(os.path.dirname(__file__), "properties-index-mapping.json")
-TOTAL_NUMBER_DOCS = 48466
+
+def get_expected_document_count(use_small_dataset=False):
+    """Return the expected number of documents based on the dataset being used"""
+    if use_small_dataset:
+        return 5000  # Smaller dataset has 5000 documents
+    else:
+        return 48466  # Full dataset has 48466 documents
 
 # Load search template from external file
 def load_search_template():
@@ -139,9 +148,12 @@ def create_search_template(
     except Exception as e:
         print(f"❌ Error creating template '{template_id}': {e}")
 
-def download_and_parallel_bulk_load():
-    print(f"📥 Downloading property data from {PROPERTIES_URL}...")
-    response = requests.get(PROPERTIES_URL, stream=True)
+def download_and_parallel_bulk_load(properties_url=None):
+    if properties_url is None:
+        properties_url = PROPERTIES_URL
+    
+    print(f"📥 Downloading property data from {properties_url}...")
+    response = requests.get(properties_url, stream=True)
     response.raise_for_status()
     print("✅ Data download started successfully")
 
@@ -219,11 +231,11 @@ def async_reindex_with_tracking():
                 print(f"   📈 Rate: {stats['created'] / (elapsed_time/60):.0f} docs/minute")
                 
                 # Check if we got the expected number of documents
-                if stats['created'] == TOTAL_NUMBER_DOCS:
-                    print(f"✅ Success! Expected {TOTAL_NUMBER_DOCS} documents were created.")
+                if stats['created'] == get_expected_document_count(args.use_small_dataset):
+                    print(f"✅ Success! Expected {get_expected_document_count(args.use_small_dataset)} documents were created.")
                     return  # Success, exit the retry loop
                 else:
-                    print(f"❌ Expected {TOTAL_NUMBER_DOCS} documents, but only {stats['created']} were created.")
+                    print(f"❌ Expected {get_expected_document_count(args.use_small_dataset)} documents, but only {stats['created']} were created.")
                     if retry_count < max_retries:
                         print(f"🗑️ Deleting destination index '{INDEX_NAME}' and retrying...")
                         if es.indices.exists(index=INDEX_NAME):
@@ -233,7 +245,7 @@ def async_reindex_with_tracking():
                         break  # Break out of the polling loop to retry
                     else:
                         print(f"❌ Max retries ({max_retries}) reached. Reindex failed to create expected number of documents.")
-                        raise Exception(f"Reindex failed: expected {TOTAL_NUMBER_DOCS} documents, got {stats['created']}")
+                        raise Exception(f"Reindex failed: expected {get_expected_document_count(args.use_small_dataset)} documents, got {stats['created']}")
                 break
             else:
                 # Get progress info if available
@@ -262,6 +274,9 @@ def cleanup_raw_index():
 
 # Main execution logic based on command line arguments
 if __name__ == "__main__":
+    # Determine which dataset URL to use
+    dataset_url = PROPERTIES_5000_URL if args.use_small_dataset else PROPERTIES_URL
+    
     # Check ELSER deployment before proceeding (only if not just search template)
     if not args.searchtemplate:
         if not check_elser_deployment():
@@ -281,7 +296,7 @@ if __name__ == "__main__":
         create_raw_index()
         create_properties_index()
         create_search_template()
-        download_and_parallel_bulk_load()
+        download_and_parallel_bulk_load(dataset_url)
         async_reindex_with_tracking()
         cleanup_raw_index()
         print("✅ Complete data ingestion pipeline complete!")
@@ -302,7 +317,7 @@ if __name__ == "__main__":
         print("🎯 Running recreate index operation...")
         create_raw_index()
         create_properties_index()
-        download_and_parallel_bulk_load()
+        download_and_parallel_bulk_load(dataset_url)
         print("✅ Index recreation and data loading complete!")
         operations_run = True
         
@@ -313,7 +328,7 @@ if __name__ == "__main__":
         create_raw_index()
         create_properties_index()
         create_search_template()
-        download_and_parallel_bulk_load()
+        download_and_parallel_bulk_load(dataset_url)
         async_reindex_with_tracking()
         cleanup_raw_index()
         print("🎉 Property data ingestion and processing complete!")

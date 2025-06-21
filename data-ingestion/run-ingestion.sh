@@ -9,6 +9,7 @@ show_usage() {
     echo "  --full-ingestion    Run the complete data ingestion pipeline (create indices, download data, process with ELSER)"
     echo "  --reindex           Run the reindex operation (requires existing raw index)"
     echo "  --recreate-index    Delete and recreate the properties index (no data processing)"
+    echo "  --use-small-dataset Use the smaller 5000-line dataset instead of the full dataset"
     echo "  -h, --help          Show this help message"
     echo ""
     echo "Multiple flags can be combined to run specific operations."
@@ -20,8 +21,10 @@ show_usage() {
     echo "  $0 --full-ingestion   # Run complete data ingestion pipeline"
     echo "  $0 --reindex          # Only reindex (requires raw index to exist)"
     echo "  $0 --recreate-index   # Delete and recreate properties index"
+    echo "  $0 --use-small-dataset # Run entire script with smaller dataset"
     echo "  $0 --searchtemplate --full-ingestion  # Create search templates and run ingestion"
     echo "  $0 --full-ingestion --reindex         # Run ingestion and reindex"
+    echo "  $0 --full-ingestion --use-small-dataset # Run ingestion with smaller dataset"
 }
 
 # Parse command line arguments
@@ -29,6 +32,7 @@ SEARCHTEMPLATE_ONLY=false
 FULL_INGESTION_ONLY=false
 REINDEX_ONLY=false
 RECREATE_INDEX_ONLY=false
+USE_SMALL_DATASET=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -46,6 +50,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --recreate-index)
             RECREATE_INDEX_ONLY=true
+            shift
+            ;;
+        --use-small-dataset)
+            USE_SMALL_DATASET=true
             shift
             ;;
         -h|--help)
@@ -71,7 +79,7 @@ CMD="python ingest-properties.py"
 
 # Check which flags were specified and build the command accordingly
 if [ "$SEARCHTEMPLATE_ONLY" = true ] || [ "$FULL_INGESTION_ONLY" = true ] || [ "$REINDEX_ONLY" = true ] || [ "$RECREATE_INDEX_ONLY" = true ]; then
-    # At least one flag was specified, so we'll run specific operations
+    # At least one specific operation flag was specified, so we'll run specific operations
     echo "Running specified operations:"
     
     if [ "$SEARCHTEMPLATE_ONLY" = true ]; then
@@ -93,6 +101,15 @@ if [ "$SEARCHTEMPLATE_ONLY" = true ] || [ "$FULL_INGESTION_ONLY" = true ] || [ "
         echo "  - Recreate properties index"
         CMD="$CMD --recreate-index"
     fi
+    
+    if [ "$USE_SMALL_DATASET" = true ]; then
+        echo "  - Use smaller dataset"
+        CMD="$CMD --use-small-dataset"
+    fi
+elif [ "$USE_SMALL_DATASET" = true ]; then
+    # Only --use-small-dataset was specified, run entire script with smaller dataset
+    echo "Running complete property data ingestion with smaller dataset..."
+    CMD="$CMD --use-small-dataset"
 else
     echo "Running complete property data ingestion..."
 fi
@@ -104,15 +121,17 @@ $CMD
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
 
 # Update README.md with execution information
-if [ "$SEARCHTEMPLATE_ONLY" = true ] && [ "$FULL_INGESTION_ONLY" = false ] && [ "$REINDEX_ONLY" = false ] && [ "$RECREATE_INDEX_ONLY" = false ]; then
+if [ "$SEARCHTEMPLATE_ONLY" = true ] && [ "$FULL_INGESTION_ONLY" = false ] && [ "$REINDEX_ONLY" = false ] && [ "$RECREATE_INDEX_ONLY" = false ] && [ "$USE_SMALL_DATASET" = false ]; then
     echo -e "\n## Last Search Template Creation\nLast run: $TIMESTAMP" >> README.md
-elif [ "$FULL_INGESTION_ONLY" = true ] && [ "$SEARCHTEMPLATE_ONLY" = false ] && [ "$REINDEX_ONLY" = false ] && [ "$RECREATE_INDEX_ONLY" = false ]; then
+elif [ "$FULL_INGESTION_ONLY" = true ] && [ "$SEARCHTEMPLATE_ONLY" = false ] && [ "$REINDEX_ONLY" = false ] && [ "$RECREATE_INDEX_ONLY" = false ] && [ "$USE_SMALL_DATASET" = false ]; then
     echo -e "\n## Last Complete Data Ingestion\nLast run: $TIMESTAMP" >> README.md
-elif [ "$REINDEX_ONLY" = true ] && [ "$SEARCHTEMPLATE_ONLY" = false ] && [ "$FULL_INGESTION_ONLY" = false ] && [ "$RECREATE_INDEX_ONLY" = false ]; then
+elif [ "$REINDEX_ONLY" = true ] && [ "$SEARCHTEMPLATE_ONLY" = false ] && [ "$FULL_INGESTION_ONLY" = false ] && [ "$RECREATE_INDEX_ONLY" = false ] && [ "$USE_SMALL_DATASET" = false ]; then
     echo -e "\n## Last Reindex Operation\nLast run: $TIMESTAMP" >> README.md
-elif [ "$RECREATE_INDEX_ONLY" = true ] && [ "$SEARCHTEMPLATE_ONLY" = false ] && [ "$FULL_INGESTION_ONLY" = false ] && [ "$REINDEX_ONLY" = false ]; then
+elif [ "$RECREATE_INDEX_ONLY" = true ] && [ "$SEARCHTEMPLATE_ONLY" = false ] && [ "$FULL_INGESTION_ONLY" = false ] && [ "$REINDEX_ONLY" = false ] && [ "$USE_SMALL_DATASET" = false ]; then
     echo -e "\n## Last Recreate Properties Index\nLast run: $TIMESTAMP" >> README.md
-elif [ "$SEARCHTEMPLATE_ONLY" = true ] || [ "$FULL_INGESTION_ONLY" = true ] || [ "$REINDEX_ONLY" = true ] || [ "$RECREATE_INDEX_ONLY" = true ]; then
+elif [ "$USE_SMALL_DATASET" = true ] && [ "$SEARCHTEMPLATE_ONLY" = false ] && [ "$FULL_INGESTION_ONLY" = false ] && [ "$REINDEX_ONLY" = false ] && [ "$RECREATE_INDEX_ONLY" = false ]; then
+    echo -e "\n## Last Full Execution with Small Dataset\nLast run: $TIMESTAMP" >> README.md
+elif [ "$SEARCHTEMPLATE_ONLY" = true ] || [ "$FULL_INGESTION_ONLY" = true ] || [ "$REINDEX_ONLY" = true ] || [ "$RECREATE_INDEX_ONLY" = true ] || [ "$USE_SMALL_DATASET" = true ]; then
     echo -e "\n## Last Partial Execution\nLast run: $TIMESTAMP" >> README.md
     echo "Operations run:" >> README.md
     if [ "$SEARCHTEMPLATE_ONLY" = true ]; then 
@@ -126,6 +145,9 @@ elif [ "$SEARCHTEMPLATE_ONLY" = true ] || [ "$FULL_INGESTION_ONLY" = true ] || [
     fi
     if [ "$RECREATE_INDEX_ONLY" = true ]; then 
         echo "  - Recreate properties index" >> README.md
+    fi
+    if [ "$USE_SMALL_DATASET" = true ]; then 
+        echo "  - Use smaller dataset" >> README.md
     fi
 else
     echo -e "\n## Last Full Execution\nLast run: $TIMESTAMP" >> README.md
