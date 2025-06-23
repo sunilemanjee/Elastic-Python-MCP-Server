@@ -50,7 +50,7 @@ def get_expected_document_count(use_small_dataset=False):
     if use_small_dataset:
         return 5000  # Smaller dataset has 5000 documents
     else:
-        return 48466  # Full dataset has 48466 documents
+        return 48966  # Full dataset has 48966 documents
 
 # Load search template from external file
 def load_search_template():
