@@ -47,7 +47,7 @@ MCP_PORT=8001
 Use the provided script for easy setup:
 
 ```bash
-./docker-run.sh
+./run-mcp-docker.sh
 ```
 
 Or run manually:
@@ -56,7 +56,21 @@ Or run manually:
 docker-compose up --build -d
 ```
 
-### 3. Verify the Server
+### 3. Stop the Server
+
+Use the provided stop script:
+
+```bash
+./stop-mcp-docker.sh
+```
+
+Or run manually:
+
+```bash
+docker-compose down
+```
+
+### 4. Verify the Server
 
 Check if the server is running:
 
@@ -109,11 +123,15 @@ The `docker-compose.yml` provides:
 
 ### Start the server
 ```bash
+./run-mcp-docker.sh
+# or
 docker-compose up -d
 ```
 
 ### Stop the server
 ```bash
+./stop-mcp-docker.sh
+# or
 docker-compose down
 ```
 
@@ -285,7 +303,8 @@ docker ps --format "table {{.Names}}\t{{.Status}}"
 ### Permission issues
 ```bash
 # Fix file permissions
-chmod +x docker-run.sh
+chmod +x run-mcp-docker.sh
+chmod +x stop-mcp-docker.sh
 chmod 600 .env
 ```
 
