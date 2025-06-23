@@ -18,7 +18,7 @@ parser.add_argument('--searchtemplate', action='store_true',
 parser.add_argument('--full-ingestion', action='store_true', 
                    help='Only run the complete data ingestion pipeline (create indices, download data, process with ELSER)')
 parser.add_argument('--reindex', action='store_true', 
-                   help='Only run the reindex operation (requires existing raw index)')
+                   help='Only run the reindex operation (recreates properties index, requires existing raw index)')
 parser.add_argument('--recreate-index', action='store_true', 
                    help='Only delete and recreate the properties index (no data processing)')
 parser.add_argument('--use-small-dataset', action='store_true',
@@ -309,6 +309,15 @@ if __name__ == "__main__":
         if not es.indices.exists(index=RAW_INDEX_NAME):
             print(f"❌ Raw index '{RAW_INDEX_NAME}' does not exist. Please run with --full-ingestion first.")
             exit(1)
+        
+        # Delete and recreate the properties index to ensure clean state
+        print(f"🗑️ Deleting and recreating properties index '{INDEX_NAME}'...")
+        if es.indices.exists(index=INDEX_NAME):
+            es.indices.delete(index=INDEX_NAME)
+            print(f"🗑️ Index '{INDEX_NAME}' deleted.")
+        
+        create_properties_index()
+        
         async_reindex_with_tracking()
         print("✅ Reindex operation complete!")
         operations_run = True

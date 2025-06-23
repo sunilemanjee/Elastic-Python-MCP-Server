@@ -42,4 +42,5 @@ Thumbs.db
 .chainlit/
 
 # Data Ingestion
-data-ingestion/search-properties.py 
+data-ingestion/search-properties.py
+data-ingestion/data/*.json 

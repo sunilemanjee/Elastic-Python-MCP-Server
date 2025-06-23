@@ -7,7 +7,7 @@ show_usage() {
     echo "Options:"
     echo "  --searchtemplate    Run the search template creation part"
     echo "  --full-ingestion    Run the complete data ingestion pipeline (create indices, download data, process with ELSER)"
-    echo "  --reindex           Run the reindex operation (requires existing raw index)"
+    echo "  --reindex           Run the reindex operation (recreates properties index, requires existing raw index)"
     echo "  --recreate-index    Delete and recreate the properties index (no data processing)"
     echo "  --use-small-dataset Use the smaller 5000-line dataset instead of the full dataset"
     echo "  -h, --help          Show this help message"
@@ -70,6 +70,10 @@ done
 
 # Activate virtual environment
 source venv/bin/activate
+
+# Install/update requirements
+echo "Installing/updating required packages..."
+pip install -r requirements.txt
 
 # Source environment variables
 source ../env_config.sh

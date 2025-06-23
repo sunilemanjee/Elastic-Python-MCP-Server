@@ -57,6 +57,7 @@ The ingestion script supports several operation modes:
 
 ### `--reindex`
 - Only performs reindexing from raw to processed index
+- **Recreates the properties index** to ensure clean state with latest mapping
 - Requires existing raw index
 - Useful for reprocessing data with ELSER
 
