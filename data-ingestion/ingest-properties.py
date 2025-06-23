@@ -32,6 +32,9 @@ os.makedirs(DATA_DIR, exist_ok=True)
 # Elasticsearch Configurations
 ES_URL = os.getenv('ES_URL' ) ## expects full URL including scheme (http/https) and port (:443) 
 ES_API_KEY = os.getenv('ES_API_KEY')
+ES_USERNAME = os.getenv('ES_USERNAME')
+ES_PASSWORD = os.getenv('ES_PASSWORD')
+USE_PASSWORD_AUTH = os.getenv('USE_PASSWORD_AUTH', 'false').lower() == 'true'
 
 # Constants
 RAW_INDEX_NAME = "properties_raw"
@@ -87,15 +90,36 @@ search_template_content = load_search_template()
 print("🔧 Initializing Elasticsearch connection...")
 
 # Connect to Elasticsearch
-if not ES_URL or not ES_API_KEY:
-    raise ValueError("ES_URL and ES_API_KEY environment variables must be set")
-es = Elasticsearch(
-    hosts=[ES_URL], 
-    api_key=ES_API_KEY, 
-    request_timeout=600,
-    retry_on_timeout=True,
-    max_retries=10
-)
+if not ES_URL:
+    raise ValueError("ES_URL environment variable must be set")
+
+if USE_PASSWORD_AUTH:
+    # Use username/password authentication
+    if not ES_USERNAME or not ES_PASSWORD:
+        raise ValueError("ES_USERNAME and ES_PASSWORD environment variables must be set when USE_PASSWORD_AUTH=true")
+    
+    print("🔐 Using username/password authentication...")
+    es = Elasticsearch(
+        hosts=[ES_URL], 
+        basic_auth=(ES_USERNAME, ES_PASSWORD),
+        request_timeout=600,
+        retry_on_timeout=True,
+        max_retries=10
+    )
+else:
+    # Use API key authentication
+    if not ES_API_KEY:
+        raise ValueError("ES_API_KEY environment variable must be set when USE_PASSWORD_AUTH=false")
+    
+    print("🔑 Using API key authentication...")
+    es = Elasticsearch(
+        hosts=[ES_URL], 
+        api_key=ES_API_KEY, 
+        request_timeout=600,
+        retry_on_timeout=True,
+        max_retries=10
+    )
+
 es.info()
 print("✅ Connected to Elasticsearch successfully")
 
