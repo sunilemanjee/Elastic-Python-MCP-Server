@@ -121,43 +121,7 @@ fi
 # Run the Python script with flags
 $CMD
 
-# Get the current timestamp
-TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
-
-# Update README.md with execution information
-if [ "$SEARCHTEMPLATE_ONLY" = true ] && [ "$FULL_INGESTION_ONLY" = false ] && [ "$REINDEX_ONLY" = false ] && [ "$RECREATE_INDEX_ONLY" = false ] && [ "$USE_SMALL_DATASET" = false ]; then
-    echo -e "\n## Last Search Template Creation\nLast run: $TIMESTAMP" >> README.md
-elif [ "$FULL_INGESTION_ONLY" = true ] && [ "$SEARCHTEMPLATE_ONLY" = false ] && [ "$REINDEX_ONLY" = false ] && [ "$RECREATE_INDEX_ONLY" = false ] && [ "$USE_SMALL_DATASET" = false ]; then
-    echo -e "\n## Last Complete Data Ingestion\nLast run: $TIMESTAMP" >> README.md
-elif [ "$REINDEX_ONLY" = true ] && [ "$SEARCHTEMPLATE_ONLY" = false ] && [ "$FULL_INGESTION_ONLY" = false ] && [ "$RECREATE_INDEX_ONLY" = false ] && [ "$USE_SMALL_DATASET" = false ]; then
-    echo -e "\n## Last Reindex Operation\nLast run: $TIMESTAMP" >> README.md
-elif [ "$RECREATE_INDEX_ONLY" = true ] && [ "$SEARCHTEMPLATE_ONLY" = false ] && [ "$FULL_INGESTION_ONLY" = false ] && [ "$REINDEX_ONLY" = false ] && [ "$USE_SMALL_DATASET" = false ]; then
-    echo -e "\n## Last Recreate Properties Index\nLast run: $TIMESTAMP" >> README.md
-elif [ "$USE_SMALL_DATASET" = true ] && [ "$SEARCHTEMPLATE_ONLY" = false ] && [ "$FULL_INGESTION_ONLY" = false ] && [ "$REINDEX_ONLY" = false ] && [ "$RECREATE_INDEX_ONLY" = false ]; then
-    echo -e "\n## Last Full Execution with Small Dataset\nLast run: $TIMESTAMP" >> README.md
-elif [ "$SEARCHTEMPLATE_ONLY" = true ] || [ "$FULL_INGESTION_ONLY" = true ] || [ "$REINDEX_ONLY" = true ] || [ "$RECREATE_INDEX_ONLY" = true ] || [ "$USE_SMALL_DATASET" = true ]; then
-    echo -e "\n## Last Partial Execution\nLast run: $TIMESTAMP" >> README.md
-    echo "Operations run:" >> README.md
-    if [ "$SEARCHTEMPLATE_ONLY" = true ]; then 
-        echo "  - Search template creation" >> README.md
-    fi
-    if [ "$FULL_INGESTION_ONLY" = true ]; then 
-        echo "  - Complete data ingestion pipeline" >> README.md
-    fi
-    if [ "$REINDEX_ONLY" = true ]; then 
-        echo "  - Reindex operation" >> README.md
-    fi
-    if [ "$RECREATE_INDEX_ONLY" = true ]; then 
-        echo "  - Recreate properties index" >> README.md
-    fi
-    if [ "$USE_SMALL_DATASET" = true ]; then 
-        echo "  - Use smaller dataset" >> README.md
-    fi
-else
-    echo -e "\n## Last Full Execution\nLast run: $TIMESTAMP" >> README.md
-fi
-
 # Deactivate virtual environment
 deactivate
 
-echo "Operation complete! README.md has been updated with execution timestamp." 
+echo "Operation complete!" 

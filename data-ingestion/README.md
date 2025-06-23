@@ -37,7 +37,7 @@ This script loads property data into Elasticsearch for the intelligent property 
    ./run-ingestion.sh --full-ingestion    # Complete pipeline
    ./run-ingestion.sh --searchtemplate    # Only create search templates
    ./run-ingestion.sh --reindex           # Only reindex (requires raw index)
-   ./run-ingestion.sh --recreate-index    # Recreate index without processing
+   ./run-ingestion.sh --recreate-index    # Recreate indices and load raw data
    ./run-ingestion.sh --use-small-dataset # Run everything with smaller dataset
    ```
 
@@ -62,9 +62,10 @@ The ingestion script supports several operation modes:
 - Useful for reprocessing data with ELSER
 
 ### `--recreate-index`
-- Deletes and recreates the properties index
-- Downloads and loads data without ELSER processing
-- Useful for testing or when ELSER is not available
+- Deletes and recreates both raw and properties indices
+- Downloads fresh data from remote source and performs ingestion into raw index
+- **No reindex operation** - properties index remains empty, no ELSER processing
+- Useful for testing or when you want raw data only
 
 ### `--use-small-dataset`
 - Uses a smaller 5000-line dataset instead of the full 48,466-line dataset
@@ -246,42 +247,5 @@ The setup script automatically installs:
 - requests
 - python-dateutil
 
-## Execution History
 
-The script automatically tracks execution history in this README:
 
-## Last Execution
-Last run: 2025-06-20 20:42:58
-
-## Last Reindex Operation
-Last run: 2025-06-20 21:02:29
-
-## Last Reindex Operation
-Last run: 2025-06-20 21:02:39
-
-## Last Reindex Operation
-Last run: 2025-06-20 21:04:35
-
-## Last Reindex Operation
-Last run: 2025-06-20 21:05:31
-
-## Last Reindex Operation
-Last run: 2025-06-21 04:28:09
-
-## Last Reindex Operation
-Last run: 2025-06-21 06:14:51
-
-## Last Reindex Operation
-Last run: 2025-06-21 06:24:58
-
-## Last Recreate Properties Index
-Last run: 2025-06-21 06:29:18
-
-## Last Recreate Properties Index
-Last run: 2025-06-21 06:29:34
-
-## Last Search Template Creation
-Last run: 2025-06-21 06:29:49
-
-## Last Search Template Creation
-Last run: 2025-06-21 06:36:45
