@@ -1,5 +1,2 @@
-elasticsearch==8.17.0
-openai
-streamlit
-requests
-python-dateutil 
+elasticsearch==8.18.1
+requests==2.31.0 

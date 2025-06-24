@@ -10,6 +10,7 @@ show_usage() {
     echo "  --reindex           Run the reindex operation (recreates properties index, requires existing raw index)"
     echo "  --recreate-index    Delete and recreate the properties index (no data processing)"
     echo "  --use-small-dataset Use the smaller 5000-line dataset instead of the full dataset"
+    echo "  --use-tiny-dataset  Use the tiny 500-line dataset instead of the full dataset"
     echo "  -h, --help          Show this help message"
     echo ""
     echo "Multiple flags can be combined to run specific operations."
@@ -22,9 +23,11 @@ show_usage() {
     echo "  $0 --reindex          # Only reindex (requires raw index to exist)"
     echo "  $0 --recreate-index   # Delete and recreate properties index"
     echo "  $0 --use-small-dataset # Run entire script with smaller dataset"
+    echo "  $0 --use-tiny-dataset  # Run entire script with tiny dataset"
     echo "  $0 --searchtemplate --full-ingestion  # Create search templates and run ingestion"
     echo "  $0 --full-ingestion --reindex         # Run ingestion and reindex"
     echo "  $0 --full-ingestion --use-small-dataset # Run ingestion with smaller dataset"
+    echo "  $0 --full-ingestion --use-tiny-dataset  # Run ingestion with tiny dataset"
 }
 
 # Parse command line arguments
@@ -33,6 +36,7 @@ FULL_INGESTION_ONLY=false
 REINDEX_ONLY=false
 RECREATE_INDEX_ONLY=false
 USE_SMALL_DATASET=false
+USE_TINY_DATASET=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -54,6 +58,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --use-small-dataset)
             USE_SMALL_DATASET=true
+            shift
+            ;;
+        --use-tiny-dataset)
+            USE_TINY_DATASET=true
             shift
             ;;
         -h|--help)
@@ -110,10 +118,19 @@ if [ "$SEARCHTEMPLATE_ONLY" = true ] || [ "$FULL_INGESTION_ONLY" = true ] || [ "
         echo "  - Use smaller dataset"
         CMD="$CMD --use-small-dataset"
     fi
+    
+    if [ "$USE_TINY_DATASET" = true ]; then
+        echo "  - Use tiny dataset"
+        CMD="$CMD --use-tiny-dataset"
+    fi
 elif [ "$USE_SMALL_DATASET" = true ]; then
     # Only --use-small-dataset was specified, run entire script with smaller dataset
     echo "Running complete property data ingestion with smaller dataset..."
     CMD="$CMD --use-small-dataset"
+elif [ "$USE_TINY_DATASET" = true ]; then
+    # Only --use-tiny-dataset was specified, run entire script with tiny dataset
+    echo "Running complete property data ingestion with tiny dataset..."
+    CMD="$CMD --use-tiny-dataset"
 else
     echo "Running complete property data ingestion..."
 fi
