@@ -3,11 +3,7 @@
 import os
 import json
 import argparse
-from openai import AzureOpenAI
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
-from elasticsearch import Elasticsearch, helpers, NotFoundError
-from elasticsearch.helpers import scan, bulk
+from elasticsearch import Elasticsearch, helpers
 import requests
 import time
 
@@ -23,6 +19,8 @@ parser.add_argument('--recreate-index', action='store_true',
                    help='Only delete and recreate the properties index (no data processing)')
 parser.add_argument('--use-small-dataset', action='store_true',
                    help='Use the smaller 5000-line dataset instead of the full dataset')
+parser.add_argument('--use-tiny-dataset', action='store_true',
+                   help='Use the tiny 500-line dataset instead of the full dataset')
 args = parser.parse_args()
 
 # Create data directory if it doesn't exist
@@ -30,27 +28,43 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Elasticsearch Configurations
-ES_URL = os.getenv('ES_URL' ) ## expects full URL including scheme (http/https) and port (:443) 
-ES_API_KEY = os.getenv('ES_API_KEY')
-ES_USERNAME = os.getenv('ES_USERNAME')
-ES_PASSWORD = os.getenv('ES_PASSWORD')
-USE_PASSWORD_AUTH = os.getenv('USE_PASSWORD_AUTH', 'false').lower() == 'true'
+INSTRUQT_WORKSHOP_SETTINGS = os.getenv('INSTRUQT_WORKSHOP_SETTINGS', 'false').lower() == 'true'
+
+if INSTRUQT_WORKSHOP_SETTINGS:
+    # Use Instruqt workshop settings
+    ES_URL = os.getenv('INSTRUQT_ES_URL')
+    ES_USERNAME = os.getenv('INSTRUQT_ES_USERNAME')
+    ES_PASSWORD = os.getenv('INSTRUQT_ES_PASSWORD')
+    ES_API_KEY = None  # Not used in Instruqt workshop settings
+    USE_PASSWORD_AUTH = True  # Always use password auth for Instruqt
+    print("🎓 Using Instruqt workshop settings for Elasticsearch connection")
+else:
+    # Use regular settings
+    ES_URL = os.getenv('ES_URL')  # expects full URL including scheme (http/https) and port (:443) 
+    ES_API_KEY = os.getenv('ES_API_KEY')
+    ES_USERNAME = os.getenv('ES_USERNAME')
+    ES_PASSWORD = os.getenv('ES_PASSWORD')
+    USE_PASSWORD_AUTH = os.getenv('USE_PASSWORD_AUTH', 'false').lower() == 'true'
+
+REINDEX_BATCH_SIZE = os.getenv('REINDEX_BATCH_SIZE', 500)
+INDEX_NAME = os.getenv('ES_INDEX', "properties")
+TEMPLATE_ID = os.getenv('PROPERTIES_SEARCH_TEMPLATE', "properties-search-template")
+ELSER_INFERENCE_ID = os.getenv('ELSER_INFERENCE_ID', ".elser-2-elasticsearch")
 
 # Constants
 RAW_INDEX_NAME = "properties_raw"
-INDEX_NAME = "properties"
-TEMPLATE_ID = "properties-search-template"
-PROPERTIES_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties.json"
+PROPERTIES_FULL_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties.json"
 PROPERTIES_5000_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties-filtered-5000-lines.json"
-PROPERTIES_FILE = os.path.join(DATA_DIR, "properties.json")
-ELSER_INFERENCE_ID = ".elser-2-elasticsearch"
+PROPERTIES_500_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties-filtered-500-lines.json"
 SEARCH_TEMPLATE_FILE = os.path.join(os.path.dirname(__file__), "search-template.mustache")
 RAW_INDEX_MAPPING_FILE = os.path.join(os.path.dirname(__file__), "raw-index-mapping.json")
 PROPERTIES_INDEX_MAPPING_FILE = os.path.join(os.path.dirname(__file__), "properties-index-mapping.json")
 
-def get_expected_document_count(use_small_dataset=False):
+def get_expected_document_count(use_small_dataset=False, use_tiny_dataset=False):
     """Return the expected number of documents based on the dataset being used"""
-    if use_small_dataset:
+    if use_tiny_dataset:
+        return 500  # Tiny dataset has 500 documents
+    elif use_small_dataset:
         return 5000  # Smaller dataset has 5000 documents
     else:
         return 48966  # Full dataset has 48966 documents
@@ -91,12 +105,22 @@ print("🔧 Initializing Elasticsearch connection...")
 
 # Connect to Elasticsearch
 if not ES_URL:
-    raise ValueError("ES_URL environment variable must be set")
+    if INSTRUQT_WORKSHOP_SETTINGS:
+        raise ValueError("INSTRUQT_ES_URL environment variable must be set when INSTRUQT_WORKSHOP_SETTINGS=true")
+    else:
+        raise ValueError("ES_URL environment variable must be set")
 
 if USE_PASSWORD_AUTH:
     # Use username/password authentication
-    if not ES_USERNAME or not ES_PASSWORD:
-        raise ValueError("ES_USERNAME and ES_PASSWORD environment variables must be set when USE_PASSWORD_AUTH=true")
+    if not ES_USERNAME:
+        if INSTRUQT_WORKSHOP_SETTINGS:
+            raise ValueError("INSTRUQT_ES_USERNAME environment variable must be set when INSTRUQT_WORKSHOP_SETTINGS=true")
+        else:
+            raise ValueError("ES_USERNAME environment variable must be set when USE_PASSWORD_AUTH=true")
+    
+    # For Instruqt workshop settings, password can be empty
+    if not INSTRUQT_WORKSHOP_SETTINGS and not ES_PASSWORD:
+        raise ValueError("ES_PASSWORD environment variable must be set when USE_PASSWORD_AUTH=true")
     
     print("🔐 Using username/password authentication...")
     es = Elasticsearch(
@@ -174,7 +198,7 @@ def create_search_template(
 
 def download_and_parallel_bulk_load(properties_url=None):
     if properties_url is None:
-        properties_url = PROPERTIES_URL
+        properties_url = PROPERTIES_FULL_URL
     
     print(f"📥 Downloading property data from {properties_url}...")
     response = requests.get(properties_url, stream=True)
@@ -255,11 +279,11 @@ def async_reindex_with_tracking():
                 print(f"   📈 Rate: {stats['created'] / (elapsed_time/60):.0f} docs/minute")
                 
                 # Check if we got the expected number of documents
-                if stats['created'] == get_expected_document_count(args.use_small_dataset):
-                    print(f"✅ Success! Expected {get_expected_document_count(args.use_small_dataset)} documents were created.")
+                if stats['created'] == get_expected_document_count(args.use_small_dataset, args.use_tiny_dataset):
+                    print(f"✅ Success! Expected {get_expected_document_count(args.use_small_dataset, args.use_tiny_dataset)} documents were created.")
                     return  # Success, exit the retry loop
                 else:
-                    print(f"❌ Expected {get_expected_document_count(args.use_small_dataset)} documents, but only {stats['created']} were created.")
+                    print(f"❌ Expected {get_expected_document_count(args.use_small_dataset, args.use_tiny_dataset)} documents, but only {stats['created']} were created.")
                     if retry_count < max_retries:
                         print(f"🗑️ Deleting destination index '{INDEX_NAME}' and retrying...")
                         if es.indices.exists(index=INDEX_NAME):
@@ -269,7 +293,7 @@ def async_reindex_with_tracking():
                         break  # Break out of the polling loop to retry
                     else:
                         print(f"❌ Max retries ({max_retries}) reached. Reindex failed to create expected number of documents.")
-                        raise Exception(f"Reindex failed: expected {get_expected_document_count(args.use_small_dataset)} documents, got {stats['created']}")
+                        raise Exception(f"Reindex failed: expected {get_expected_document_count(args.use_small_dataset, args.use_tiny_dataset)} documents, got {stats['created']}")
                 break
             else:
                 # Get progress info if available
@@ -299,7 +323,12 @@ def cleanup_raw_index():
 # Main execution logic based on command line arguments
 if __name__ == "__main__":
     # Determine which dataset URL to use
-    dataset_url = PROPERTIES_5000_URL if args.use_small_dataset else PROPERTIES_URL
+    if args.use_tiny_dataset:
+        dataset_url = PROPERTIES_500_URL
+    elif args.use_small_dataset:
+        dataset_url = PROPERTIES_5000_URL
+    else:
+        dataset_url = PROPERTIES_FULL_URL
     
     # Check ELSER deployment before proceeding (only if not just search template)
     if not args.searchtemplate:

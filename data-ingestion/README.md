@@ -39,6 +39,7 @@ This script loads property data into Elasticsearch for the intelligent property 
    ./run-ingestion.sh --reindex           # Only reindex (requires raw index)
    ./run-ingestion.sh --recreate-index    # Recreate indices and load raw data
    ./run-ingestion.sh --use-small-dataset # Run everything with smaller dataset
+   ./run-ingestion.sh --use-tiny-dataset  # Run everything with tiny dataset
    ```
 
 ## Command Line Options
@@ -73,13 +74,21 @@ The ingestion script supports several operation modes:
 - Useful for faster testing, development, and when full dataset is not needed
 - Can be combined with other flags for specific operations
 
+### `--use-tiny-dataset`
+- Uses a tiny 500-line dataset instead of the full 48,466-line dataset
+- Runs the complete data ingestion pipeline with minimal data volume
+- Useful for very fast testing, development, and when minimal dataset is sufficient
+- Can be combined with other flags for specific operations
+
 ### Multiple Operations
 You can combine flags to run multiple operations:
 ```bash
 ./run-ingestion.sh --searchtemplate --full-ingestion
 ./run-ingestion.sh --full-ingestion --reindex
 ./run-ingestion.sh --full-ingestion --use-small-dataset
+./run-ingestion.sh --full-ingestion --use-tiny-dataset
 ./run-ingestion.sh --recreate-index --use-small-dataset
+./run-ingestion.sh --recreate-index --use-tiny-dataset
 ```
 
 ## Elasticsearch Setup
@@ -131,6 +140,7 @@ Optional variables (have defaults):
 - `ELSER_INFERENCE_ID`: ELSER inference endpoint ID  
 - `ES_INDEX`: Elasticsearch index name
 
+
 ## Directory Structure
 
 ```
@@ -171,6 +181,7 @@ If you prefer to run manually:
    python ingest-properties.py --reindex
    python ingest-properties.py --recreate-index
    python ingest-properties.py --use-small-dataset
+   python ingest-properties.py --use-tiny-dataset
    ```
 
 4. **Deactivate when done:**
@@ -195,7 +206,7 @@ The script creates two indices:
 
 ## Dataset Options
 
-The script supports two dataset sizes:
+The script supports three dataset sizes:
 
 ### Full Dataset (Default)
 - **Source**: `properties.json` (48,466 documents)
@@ -209,7 +220,13 @@ The script supports two dataset sizes:
 - **Processing time**: Faster due to reduced volume
 - **Command**: `./run-ingestion.sh --use-small-dataset`
 
-Both datasets contain the same property data structure and are processed identically with ELSER semantic fields.
+### Tiny Dataset
+- **Source**: `properties-filtered-500-lines.json` (500 documents)
+- **Use case**: Very fast testing, development, and minimal validation
+- **Processing time**: Fastest due to minimal volume
+- **Command**: `./run-ingestion.sh --use-tiny-dataset`
+
+All datasets contain the same property data structure and are processed identically with ELSER semantic fields.
 
 ## Advanced Features
 
@@ -246,6 +263,51 @@ The setup script automatically installs:
 - streamlit  
 - requests
 - python-dateutil
+
+
+## Instruqt Workshop Setup
+
+**Note**: This section only applies if you are using this script within an Elastic Instruqt workshop environment.
+
+### 1. Enable Instruqt Workshop Settings
+Set the following environment variable to enable Instruqt workshop mode:
+
+```bash
+export INSTRUQT_WORKSHOP_SETTINGS=true
+```
+
+### 2. Configure Instruqt Connection Parameters
+When `INSTRUQT_WORKSHOP_SETTINGS=true`, the script will use these environment variables instead of the regular ones:
+
+```bash
+export INSTRUQT_ES_URL="http://kubernetes-vm:9200"
+export INSTRUQT_ES_USERNAME="elastic"
+export INSTRUQT_ES_PASSWORD=""  # Usually empty in Instruqt environments
+```
+
+### 3. Update Your Environment Configuration
+Edit your `env_config.sh` file to include the Instruqt settings:
+
+```bash
+# Instruqt workshop settings
+export INSTRUQT_WORKSHOP_SETTINGS=true
+export INSTRUQT_ES_URL="http://kubernetes-vm:9200"
+export INSTRUQT_ES_USERNAME="elastic"
+export INSTRUQT_ES_PASSWORD=""
+```
+
+### 4. Run the Script
+The script will automatically detect the Instruqt workshop settings and use the appropriate connection parameters. You'll see a message indicating it's using Instruqt workshop settings:
+
+```
+🎓 Using Instruqt workshop settings for Elasticsearch connection
+```
+
+**Important Notes for Instruqt Workshop:**
+- The script automatically uses password authentication (no API key required)
+- Password can be empty in Instruqt workshop environments
+- The connection URL typically points to the internal Kubernetes VM
+- All other functionality remains the same (ELSER processing, data ingestion, etc.)
 
 
 
