@@ -9,8 +9,9 @@ show_usage() {
     echo "  --full-ingestion    Run the complete data ingestion pipeline (create indices, download data, process with ELSER)"
     echo "  --reindex           Run the reindex operation (recreates properties index, requires existing raw index)"
     echo "  --recreate-index    Delete and recreate the properties index (no data processing)"
-    echo "  --use-small-dataset Use the smaller 5000-line dataset instead of the full dataset"
-    echo "  --use-tiny-dataset  Use the tiny 500-line dataset instead of the full dataset"
+    echo "  --use-small-5k-dataset Use the smaller 5000-line dataset instead of the full dataset"
+    echo "  --use-500-dataset   Use the tiny 500-line dataset instead of the full dataset"
+    echo "  --instruqt          Use Instruqt workshop settings for Elasticsearch connection"
     echo "  -h, --help          Show this help message"
     echo ""
     echo "Multiple flags can be combined to run specific operations."
@@ -22,12 +23,14 @@ show_usage() {
     echo "  $0 --full-ingestion   # Run complete data ingestion pipeline"
     echo "  $0 --reindex          # Only reindex (requires raw index to exist)"
     echo "  $0 --recreate-index   # Delete and recreate properties index"
-    echo "  $0 --use-small-dataset # Run entire script with smaller dataset"
-    echo "  $0 --use-tiny-dataset  # Run entire script with tiny dataset"
+    echo "  $0 --use-small-5k-dataset # Run entire script with smaller dataset"
+    echo "  $0 --use-500-dataset  # Run entire script with tiny dataset"
+    echo "  $0 --instruqt         # Run entire script with Instruqt workshop settings"
     echo "  $0 --searchtemplate --full-ingestion  # Create search templates and run ingestion"
     echo "  $0 --full-ingestion --reindex         # Run ingestion and reindex"
-    echo "  $0 --full-ingestion --use-small-dataset # Run ingestion with smaller dataset"
-    echo "  $0 --full-ingestion --use-tiny-dataset  # Run ingestion with tiny dataset"
+    echo "  $0 --full-ingestion --use-small-5k-dataset # Run ingestion with smaller dataset"
+    echo "  $0 --full-ingestion --use-500-dataset  # Run ingestion with tiny dataset"
+    echo "  $0 --full-ingestion --instruqt        # Run ingestion with Instruqt workshop settings"
 }
 
 # Parse command line arguments
@@ -37,6 +40,7 @@ REINDEX_ONLY=false
 RECREATE_INDEX_ONLY=false
 USE_SMALL_DATASET=false
 USE_TINY_DATASET=false
+INSTRUQT_ONLY=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -56,12 +60,16 @@ while [[ $# -gt 0 ]]; do
             RECREATE_INDEX_ONLY=true
             shift
             ;;
-        --use-small-dataset)
+        --use-small-5k-dataset)
             USE_SMALL_DATASET=true
             shift
             ;;
-        --use-tiny-dataset)
+        --use-500-dataset)
             USE_TINY_DATASET=true
+            shift
+            ;;
+        --instruqt)
+            INSTRUQT_ONLY=true
             shift
             ;;
         -h|--help)
@@ -116,21 +124,30 @@ if [ "$SEARCHTEMPLATE_ONLY" = true ] || [ "$FULL_INGESTION_ONLY" = true ] || [ "
     
     if [ "$USE_SMALL_DATASET" = true ]; then
         echo "  - Use smaller dataset"
-        CMD="$CMD --use-small-dataset"
+        CMD="$CMD --use-small-5k-dataset"
     fi
     
     if [ "$USE_TINY_DATASET" = true ]; then
         echo "  - Use tiny dataset"
-        CMD="$CMD --use-tiny-dataset"
+        CMD="$CMD --use-500-dataset"
+    fi
+    
+    if [ "$INSTRUQT_ONLY" = true ]; then
+        echo "  - Use Instruqt workshop settings"
+        CMD="$CMD --instruqt"
     fi
 elif [ "$USE_SMALL_DATASET" = true ]; then
-    # Only --use-small-dataset was specified, run entire script with smaller dataset
+    # Only --use-small-5k-dataset was specified, run entire script with smaller dataset
     echo "Running complete property data ingestion with smaller dataset..."
-    CMD="$CMD --use-small-dataset"
+    CMD="$CMD --use-small-5k-dataset"
 elif [ "$USE_TINY_DATASET" = true ]; then
-    # Only --use-tiny-dataset was specified, run entire script with tiny dataset
+    # Only --use-500-dataset was specified, run entire script with tiny dataset
     echo "Running complete property data ingestion with tiny dataset..."
-    CMD="$CMD --use-tiny-dataset"
+    CMD="$CMD --use-500-dataset"
+elif [ "$INSTRUQT_ONLY" = true ]; then
+    # Only --instruqt was specified, run entire script with Instruqt workshop settings
+    echo "Running complete property data ingestion with Instruqt workshop settings..."
+    CMD="$CMD --instruqt"
 else
     echo "Running complete property data ingestion..."
 fi

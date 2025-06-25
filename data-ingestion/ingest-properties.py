@@ -17,10 +17,12 @@ parser.add_argument('--reindex', action='store_true',
                    help='Only run the reindex operation (recreates properties index, requires existing raw index)')
 parser.add_argument('--recreate-index', action='store_true', 
                    help='Only delete and recreate the properties index (no data processing)')
-parser.add_argument('--use-small-dataset', action='store_true',
+parser.add_argument('--use-small-5k-dataset', action='store_true',
                    help='Use the smaller 5000-line dataset instead of the full dataset')
-parser.add_argument('--use-tiny-dataset', action='store_true',
+parser.add_argument('--use-500-dataset', action='store_true',
                    help='Use the tiny 500-line dataset instead of the full dataset')
+parser.add_argument('--instruqt', action='store_true',
+                   help='Use Instruqt workshop settings for Elasticsearch connection')
 args = parser.parse_args()
 
 # Create data directory if it doesn't exist
@@ -28,7 +30,7 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Elasticsearch Configurations
-INSTRUQT_WORKSHOP_SETTINGS = os.getenv('INSTRUQT_WORKSHOP_SETTINGS', 'false').lower() == 'true'
+INSTRUQT_WORKSHOP_SETTINGS = args.instruqt
 
 if INSTRUQT_WORKSHOP_SETTINGS:
     # Use Instruqt workshop settings
@@ -279,11 +281,11 @@ def async_reindex_with_tracking():
                 print(f"   📈 Rate: {stats['created'] / (elapsed_time/60):.0f} docs/minute")
                 
                 # Check if we got the expected number of documents
-                if stats['created'] == get_expected_document_count(args.use_small_dataset, args.use_tiny_dataset):
-                    print(f"✅ Success! Expected {get_expected_document_count(args.use_small_dataset, args.use_tiny_dataset)} documents were created.")
+                if stats['created'] == get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset):
+                    print(f"✅ Success! Expected {get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset)} documents were created.")
                     return  # Success, exit the retry loop
                 else:
-                    print(f"❌ Expected {get_expected_document_count(args.use_small_dataset, args.use_tiny_dataset)} documents, but only {stats['created']} were created.")
+                    print(f"❌ Expected {get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset)} documents, but only {stats['created']} were created.")
                     if retry_count < max_retries:
                         print(f"🗑️ Deleting destination index '{INDEX_NAME}' and retrying...")
                         if es.indices.exists(index=INDEX_NAME):
@@ -293,7 +295,7 @@ def async_reindex_with_tracking():
                         break  # Break out of the polling loop to retry
                     else:
                         print(f"❌ Max retries ({max_retries}) reached. Reindex failed to create expected number of documents.")
-                        raise Exception(f"Reindex failed: expected {get_expected_document_count(args.use_small_dataset, args.use_tiny_dataset)} documents, got {stats['created']}")
+                        raise Exception(f"Reindex failed: expected {get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset)} documents, got {stats['created']}")
                 break
             else:
                 # Get progress info if available
@@ -323,9 +325,9 @@ def cleanup_raw_index():
 # Main execution logic based on command line arguments
 if __name__ == "__main__":
     # Determine which dataset URL to use
-    if args.use_tiny_dataset:
+    if args.use_500_dataset:
         dataset_url = PROPERTIES_500_URL
-    elif args.use_small_dataset:
+    elif args.use_small_5k_dataset:
         dataset_url = PROPERTIES_5000_URL
     else:
         dataset_url = PROPERTIES_FULL_URL
