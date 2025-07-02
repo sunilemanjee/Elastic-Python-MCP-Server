@@ -140,10 +140,20 @@ elif [ "$USE_SMALL_DATASET" = true ]; then
     # Only --use-small-5k-dataset was specified, run entire script with smaller dataset
     echo "Running complete property data ingestion with smaller dataset..."
     CMD="$CMD --use-small-5k-dataset"
+    
+    if [ "$INSTRUQT_ONLY" = true ]; then
+        echo "  - Use Instruqt workshop settings"
+        CMD="$CMD --instruqt"
+    fi
 elif [ "$USE_TINY_DATASET" = true ]; then
     # Only --use-500-dataset was specified, run entire script with tiny dataset
     echo "Running complete property data ingestion with tiny dataset..."
     CMD="$CMD --use-500-dataset"
+    
+    if [ "$INSTRUQT_ONLY" = true ]; then
+        echo "  - Use Instruqt workshop settings"
+        CMD="$CMD --instruqt"
+    fi
 elif [ "$INSTRUQT_ONLY" = true ]; then
     # Only --instruqt was specified, run entire script with Instruqt workshop settings
     echo "Running complete property data ingestion with Instruqt workshop settings..."

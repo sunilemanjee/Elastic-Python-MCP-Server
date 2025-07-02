@@ -72,14 +72,27 @@ class ElasticsearchConfig:
 def create_elasticsearch_mcp_server(config: ElasticsearchConfig) -> FastMCP:
     """Create and configure the MCP server with Elasticsearch integration."""
     
-    # Initialize Elasticsearch client with proper API key format
-    es_client = Elasticsearch(
-        config.url,
-        api_key=config.api_key,
-        verify_certs=False,  # For demo purposes only
-        ssl_show_warn=False,  # For demo purposes only
-        request_timeout=300  # Add a 5-minute timeout
-    )
+    # Initialize Elasticsearch client with proper authentication
+    if config.api_key:
+        # Use API key authentication
+        es_client = Elasticsearch(
+            config.url,
+            api_key=config.api_key,
+            verify_certs=False,
+            ssl_show_warn=False,
+            request_timeout=300
+        )
+    elif config.username and config.password:
+        # Use username/password authentication
+        es_client = Elasticsearch(
+            config.url,
+            basic_auth=(config.username, config.password),
+            verify_certs=False,
+            ssl_show_warn=False,
+            request_timeout=300
+        )
+    else:
+        raise ValueError("Provide API Key or username/password")
     
     # Create MCP server with port configuration
     port = int(os.getenv("MCP_PORT", "8000"))

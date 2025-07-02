@@ -19,13 +19,9 @@ export MCP_PORT=8001  # Default port for the MCP server
 export TEMPLATE_CONFIG_INDEX="search-template-configs" 
 
 ##instruqt workshop settings
-export INSTRUQT_WORKSHOP_SETTINGS=false
-export INSTRUQT_ES_URL="http://kubernetes-vm:9200"
-export INSTRUQT_ES_USERNAME=""
-export INSTRUQT_ES_PASSWORD=""
+export INSTRUQT_ES_URL="http://es3-api-v1:9200"
 
 export REINDEX_BATCH_SIZE=100  # Batch size for reindexing operations
-export INDEX_NAME="properties"  # Name of the index (can be same as ES_INDEX)
 
 echo "Environment variables configured successfully!"
 echo "To start the server, run: ./run_server.sh"

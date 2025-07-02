@@ -13,8 +13,6 @@ parser.add_argument('--searchtemplate', action='store_true',
                    help='Only run the search template creation part')
 parser.add_argument('--full-ingestion', action='store_true', 
                    help='Only run the complete data ingestion pipeline (create indices, download data, process with ELSER)')
-parser.add_argument('--reindex', action='store_true', 
-                   help='Only run the reindex operation (recreates properties index, requires existing raw index)')
 parser.add_argument('--recreate-index', action='store_true', 
                    help='Only delete and recreate the properties index (no data processing)')
 parser.add_argument('--use-small-5k-dataset', action='store_true',
@@ -37,9 +35,31 @@ if INSTRUQT_WORKSHOP_SETTINGS:
     ES_URL = os.getenv('INSTRUQT_ES_URL')
     ES_USERNAME = os.getenv('INSTRUQT_ES_USERNAME')
     ES_PASSWORD = os.getenv('INSTRUQT_ES_PASSWORD')
-    ES_API_KEY = None  # Not used in Instruqt workshop settings
-    USE_PASSWORD_AUTH = True  # Always use password auth for Instruqt
-    print("🎓 Using Instruqt workshop settings for Elasticsearch connection")
+    
+    # For Instruqt, read API key from JSON file using jq pattern
+    import subprocess
+    try:
+        REGIONS = os.getenv('REGIONS')
+        if not REGIONS:
+            raise ValueError("REGIONS environment variable must be set for Instruqt workshop settings")
+        
+        # Execute the jq command to extract API key
+        result = subprocess.run([
+            'jq', '-r', '--arg', 'region', REGIONS, 
+            '.[$region].credentials.api_key', '/tmp/project_results.json'
+        ], capture_output=True, text=True, check=True)
+        
+        ES_API_KEY = result.stdout.strip()
+        if not ES_API_KEY:
+            raise ValueError("API key not found in JSON file")
+        
+        USE_PASSWORD_AUTH = False  # Use API key auth for Instruqt
+        print("🎓 Using Instruqt workshop settings for Elasticsearch connection")
+        print(f"🔑 API key extracted from JSON file for region: {REGIONS}")
+    except subprocess.CalledProcessError as e:
+        raise ValueError(f"Failed to extract API key from JSON file: {e}")
+    except FileNotFoundError:
+        raise ValueError("jq command not found. Please install jq for Instruqt workshop settings")
 else:
     # Use regular settings
     ES_URL = os.getenv('ES_URL')  # expects full URL including scheme (http/https) and port (:443) 
@@ -48,18 +68,15 @@ else:
     ES_PASSWORD = os.getenv('ES_PASSWORD')
     USE_PASSWORD_AUTH = os.getenv('USE_PASSWORD_AUTH', 'false').lower() == 'true'
 
-REINDEX_BATCH_SIZE = os.getenv('REINDEX_BATCH_SIZE', 500)
 INDEX_NAME = os.getenv('ES_INDEX', "properties")
 TEMPLATE_ID = os.getenv('PROPERTIES_SEARCH_TEMPLATE', "properties-search-template")
 ELSER_INFERENCE_ID = os.getenv('ELSER_INFERENCE_ID', ".elser-2-elasticsearch")
 
 # Constants
-RAW_INDEX_NAME = "properties_raw"
 PROPERTIES_FULL_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties.json"
 PROPERTIES_5000_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties-filtered-5000-lines.json"
 PROPERTIES_500_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties-filtered-500-lines.json"
 SEARCH_TEMPLATE_FILE = os.path.join(os.path.dirname(__file__), "search-template.mustache")
-RAW_INDEX_MAPPING_FILE = os.path.join(os.path.dirname(__file__), "raw-index-mapping.json")
 PROPERTIES_INDEX_MAPPING_FILE = os.path.join(os.path.dirname(__file__), "properties-index-mapping.json")
 
 def get_expected_document_count(use_small_dataset=False, use_tiny_dataset=False):
@@ -130,12 +147,15 @@ if USE_PASSWORD_AUTH:
         basic_auth=(ES_USERNAME, ES_PASSWORD),
         request_timeout=600,
         retry_on_timeout=True,
-        max_retries=10
+        max_retries=0
     )
 else:
     # Use API key authentication
     if not ES_API_KEY:
-        raise ValueError("ES_API_KEY environment variable must be set when USE_PASSWORD_AUTH=false")
+        if INSTRUQT_WORKSHOP_SETTINGS:
+            raise ValueError("Failed to extract API key from JSON file for Instruqt workshop settings")
+        else:
+            raise ValueError("ES_API_KEY environment variable must be set when USE_PASSWORD_AUTH=false")
     
     print("🔑 Using API key authentication...")
     es = Elasticsearch(
@@ -143,37 +163,13 @@ else:
         api_key=ES_API_KEY, 
         request_timeout=600,
         retry_on_timeout=True,
-        max_retries=10
+        max_retries=0
     )
 
 es.info()
 print("✅ Connected to Elasticsearch successfully")
 
-def check_elser_deployment():
-    """Check if ELSER is properly deployed by making a test inference call"""
-    try:
-        print("🔍 Checking ELSER deployment...")
-        response = es.inference.inference(
-            inference_id=ELSER_INFERENCE_ID,
-            input=['wake up']
-        )
-        print("✅ ELSER is properly deployed and ready to use")
-        return True
-    except Exception as e:
-        print(f"❌ Error checking ELSER deployment: {e}")
-        print("Please ensure ELSER is properly deployed before proceeding")
-        return False
 
-def create_raw_index():
-    print(f"🏗️ Creating raw index '{RAW_INDEX_NAME}'...")
-    mapping = load_index_mapping(RAW_INDEX_MAPPING_FILE)
-
-    if es.indices.exists(index=RAW_INDEX_NAME):
-        es.indices.delete(index=RAW_INDEX_NAME)
-        print(f"🗑️ Index '{RAW_INDEX_NAME}' deleted.")
-
-    es.indices.create(index=RAW_INDEX_NAME, body=mapping)
-    print(f"✅ Index '{RAW_INDEX_NAME}' created.")
 
 def create_properties_index():
     print(f"🏗️ Creating properties index '{INDEX_NAME}' with ELSER semantic fields...")
@@ -185,7 +181,6 @@ def create_properties_index():
 
     es.indices.create(index=INDEX_NAME, body=mapping)
     print(f"✅ Index '{INDEX_NAME}' created.")
-
 
 def create_search_template(
     template_id=TEMPLATE_ID, template_content=search_template_content
@@ -216,7 +211,7 @@ def download_and_parallel_bulk_load(properties_url=None):
                 if doc_count % 1000 == 0:
                     print(f"📊 Processed {doc_count} documents...")
                 yield {
-                    "_index": RAW_INDEX_NAME,
+                    "_index": INDEX_NAME,
                     "_source": doc
                 }
         print(f"📊 Total documents to index: {doc_count}")
@@ -225,11 +220,14 @@ def download_and_parallel_bulk_load(properties_url=None):
     success_count = 0
     error_count = 0
     
+    # Use smaller chunk size for Instruqt to avoid 413 errors
+    chunk_size = 50 if args.instruqt else 500
+    
     for ok, result in helpers.parallel_bulk(
         es,
         actions=generate_actions(),
         thread_count=4,
-        chunk_size=500,
+        chunk_size=chunk_size,
         request_timeout=60
     ):
         if ok:
@@ -241,101 +239,76 @@ def download_and_parallel_bulk_load(properties_url=None):
             if error_count % 100 == 0:
                 print(f"❌ Encountered {error_count} errors...")
 
-    print(f"✅ Successfully indexed {success_count} documents into '{RAW_INDEX_NAME}' using parallel_bulk")
+    print(f"✅ Successfully indexed {success_count} documents into '{INDEX_NAME}' using parallel_bulk")
     if error_count > 0:
         print(f"⚠️ Encountered {error_count} errors during indexing")
-
-def async_reindex_with_tracking():
-    max_retries = 2
-    retry_count = 0
     
-    while retry_count <= max_retries:
-        print(f"🔄 Starting reindex from '{RAW_INDEX_NAME}' to '{INDEX_NAME}' with ELSER semantic processing...")
-        if retry_count > 0:
-            print(f"🔄 Retry attempt {retry_count}/{max_retries}")
+    # Add delay for Instruqt to allow documents to be available for counting
+    if args.instruqt:
+        print("⏳ Waiting 20 seconds for documents to be available for counting...")
+        time.sleep(20)
+    
+    # Verify the final document count
+    final_count = es.count(index=INDEX_NAME)['count']
+    # For Instruqt mode, always expect 500 documents since it uses the 500-line dataset
+    if args.instruqt:
+        expected_count = 500
+    else:
+        expected_count = get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset)
+    print(f"📊 Final document count in '{INDEX_NAME}': {final_count}")
+    if final_count == expected_count:
+        print(f"✅ Success! Expected {expected_count} documents were indexed.")
+        return True
+    else:
+        print(f"⚠️ Expected {expected_count} documents, but {final_count} were indexed.")
+        return False
+
+def retry_ingestion_with_instruqt_logic(dataset_url, max_retries=5):
+    """Retry ingestion logic specifically for Instruqt workshop settings"""
+    for attempt in range(1, max_retries + 1):
+        print(f"🔄 Attempt {attempt}/{max_retries} for Instruqt ingestion...")
         
-        # Step 1: Start reindexing asynchronously
-        response = es.reindex(
-            body={
-                "source": {"index": RAW_INDEX_NAME, "size": 500 },
-                "dest": {"index": INDEX_NAME}
-            },
-            wait_for_completion=False  # Run async
-        )
-
-        task_id = response["task"]
-        print(f"🚀 Reindex started. Task ID: {task_id}")
-
-        # Step 2: Poll for completion
-        start_time = time.time()
-        while True:
-            task_status = es.tasks.get(task_id=task_id)
-            completed = task_status.get("completed", False)
-
-            if completed:
-                stats = task_status["response"]
-                elapsed_time = time.time() - start_time
-                print(f"✅ Reindex complete!")
-                print(f"   📊 {stats['created']} docs reindexed")
-                print(f"   ⏱️ Took {stats['took']}ms (wall time: {elapsed_time:.1f}s)")
-                print(f"   📈 Rate: {stats['created'] / (elapsed_time/60):.0f} docs/minute")
-                
-                # Check if we got the expected number of documents
-                if stats['created'] == get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset):
-                    print(f"✅ Success! Expected {get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset)} documents were created.")
-                    return  # Success, exit the retry loop
-                else:
-                    print(f"❌ Expected {get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset)} documents, but only {stats['created']} were created.")
-                    if retry_count < max_retries:
-                        print(f"🗑️ Deleting destination index '{INDEX_NAME}' and retrying...")
-                        if es.indices.exists(index=INDEX_NAME):
-                            es.indices.delete(index=INDEX_NAME)
-                            print(f"🗑️ Index '{INDEX_NAME}' deleted.")
-                        retry_count += 1
-                        break  # Break out of the polling loop to retry
-                    else:
-                        print(f"❌ Max retries ({max_retries}) reached. Reindex failed to create expected number of documents.")
-                        raise Exception(f"Reindex failed: expected {get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset)} documents, got {stats['created']}")
-                break
+        try:
+            # Create index and ingest data
+            create_properties_index()
+            success = download_and_parallel_bulk_load(dataset_url)
+            
+            if success:
+                print(f"✅ Success on attempt {attempt}!")
+                return True
             else:
-                # Get progress info if available
-                if "status" in task_status:
-                    status = task_status["status"]
-                    if "total" in status and "updated" in status:
-                        total = status["total"]
-                        updated = status["updated"]
-                        if total > 0:
-                            progress = (updated / total) * 100
-                            print(f"⏳ Reindex progress: {progress:.1f}% ({updated}/{total})")
-                        else:
-                            print("⏳ Reindex in progress...")
-                    else:
-                        print("⏳ Reindex in progress...")
+                print(f"❌ Attempt {attempt} failed - incorrect document count")
+                if attempt < max_retries:
+                    print("⏳ Waiting 30 seconds before retry...")
+                    time.sleep(30)
                 else:
-                    print("⏳ Reindex in progress...")
-                print("   Checking again in 10 seconds...")
-                time.sleep(10)
-
-def cleanup_raw_index():
-    print("🧹 Cleaning up temporary index...")
-    if es.indices.exists(index=RAW_INDEX_NAME):
-        es.indices.delete(index=RAW_INDEX_NAME)
-        print(f"🗑️ Index '{RAW_INDEX_NAME}' deleted.")
+                    print(f"❌ All {max_retries} attempts failed")
+                    return False
+                    
+        except Exception as e:
+            print(f"❌ Attempt {attempt} failed with error: {e}")
+            if attempt < max_retries:
+                print("⏳ Waiting 30 seconds before retry...")
+                time.sleep(30)
+            else:
+                print(f"❌ All {max_retries} attempts failed")
+                return False
 
 # Main execution logic based on command line arguments
 if __name__ == "__main__":
     # Determine which dataset URL to use
-    if args.use_500_dataset:
+    if args.instruqt:
+        # When using Instruqt workshop settings, always use the 500-line dataset
+        dataset_url = PROPERTIES_500_URL
+        print("🎓 Instruqt mode: Using 500-line dataset")
+    elif args.use_500_dataset:
         dataset_url = PROPERTIES_500_URL
     elif args.use_small_5k_dataset:
         dataset_url = PROPERTIES_5000_URL
     else:
         dataset_url = PROPERTIES_FULL_URL
     
-    # Check ELSER deployment before proceeding (only if not just search template)
-    if not args.searchtemplate:
-        if not check_elser_deployment():
-            raise SystemExit("ELSER deployment check failed. Please deploy ELSER before proceeding.")
+
 
     # Track if any specific operations were run
     operations_run = False
@@ -348,52 +321,59 @@ if __name__ == "__main__":
         
     if args.full_ingestion:
         print("🎯 Running complete data ingestion pipeline...")
-        create_raw_index()
-        create_properties_index()
-        create_search_template()
-        download_and_parallel_bulk_load(dataset_url)
-        async_reindex_with_tracking()
-        cleanup_raw_index()
-        print("✅ Complete data ingestion pipeline complete!")
-        print(f"📋 Final index '{INDEX_NAME}' is ready for semantic search with ELSER")
-        operations_run = True
-        
-    if args.reindex:
-        print("🎯 Running reindex operation...")
-        # Check if raw index exists
-        if not es.indices.exists(index=RAW_INDEX_NAME):
-            print(f"❌ Raw index '{RAW_INDEX_NAME}' does not exist. Please run with --full-ingestion first.")
-            exit(1)
-        
-        # Delete and recreate the properties index to ensure clean state
-        print(f"🗑️ Deleting and recreating properties index '{INDEX_NAME}'...")
-        if es.indices.exists(index=INDEX_NAME):
-            es.indices.delete(index=INDEX_NAME)
-            print(f"🗑️ Index '{INDEX_NAME}' deleted.")
-        
-        create_properties_index()
-        
-        async_reindex_with_tracking()
-        print("✅ Reindex operation complete!")
+        if args.instruqt:
+            # Use retry logic for Instruqt
+            success = retry_ingestion_with_instruqt_logic(dataset_url)
+            if success:
+                create_search_template()
+                print("✅ Complete data ingestion pipeline complete!")
+                print(f"📋 Final index '{INDEX_NAME}' is ready for semantic search")
+            else:
+                print("❌ Data ingestion pipeline failed after all retry attempts")
+                exit(1)
+        else:
+            # Regular ingestion for non-Instruqt
+            create_properties_index()
+            create_search_template()
+            download_and_parallel_bulk_load(dataset_url)
+            print("✅ Complete data ingestion pipeline complete!")
+            print(f"📋 Final index '{INDEX_NAME}' is ready for semantic search with ELSER")
         operations_run = True
         
     if args.recreate_index:
         print("🎯 Running recreate index operation...")
-        create_raw_index()
-        create_properties_index()
-        download_and_parallel_bulk_load(dataset_url)
-        print("✅ Index recreation and data loading complete!")
+        if args.instruqt:
+            # Use retry logic for Instruqt
+            success = retry_ingestion_with_instruqt_logic(dataset_url)
+            if success:
+                print("✅ Index recreation and data loading complete!")
+            else:
+                print("❌ Index recreation failed after all retry attempts")
+                exit(1)
+        else:
+            # Regular recreation for non-Instruqt
+            create_properties_index()
+            download_and_parallel_bulk_load(dataset_url)
+            print("✅ Index recreation and data loading complete!")
         operations_run = True
         
     # If no specific flags were provided, run everything
     if not operations_run:
         print("🎯 Running complete property data ingestion...")
-        # Run everything
-        create_raw_index()
-        create_properties_index()
-        create_search_template()
-        download_and_parallel_bulk_load(dataset_url)
-        async_reindex_with_tracking()
-        cleanup_raw_index()
-        print("🎉 Property data ingestion and processing complete!")
-        print(f"📋 Final index '{INDEX_NAME}' is ready for semantic search with ELSER")
+        if args.instruqt:
+            # Use retry logic for Instruqt
+            success = retry_ingestion_with_instruqt_logic(dataset_url)
+            if success:
+                create_search_template()
+                print("🎉 Property data ingestion and processing complete!")
+                print(f"📋 Final index '{INDEX_NAME}' is ready for semantic search")
+            else:
+                print("❌ Property data ingestion failed after all retry attempts")
+                exit(1)
+        else:
+            # Regular ingestion for non-Instruqt
+            create_properties_index()
+            create_search_template()
+            download_and_parallel_bulk_load(dataset_url)
+            print("🎉 Property data ingestion and processing complete!")
+            print(f"📋 Final index '{INDEX_NAME}' is ready for semantic search")
