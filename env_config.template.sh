@@ -18,8 +18,6 @@ export ES_INDEX="properties"
 export MCP_PORT=8001  # Default port for the MCP server
 export TEMPLATE_CONFIG_INDEX="search-template-configs" 
 
-##instruqt workshop settings
-export INSTRUQT_ES_URL="http://es3-api-v1:9200"
 
 export REINDEX_BATCH_SIZE=100  # Batch size for reindexing operations
 

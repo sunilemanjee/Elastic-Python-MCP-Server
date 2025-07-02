@@ -30,23 +30,20 @@ os.makedirs(DATA_DIR, exist_ok=True)
 # Elasticsearch Configurations
 INSTRUQT_WORKSHOP_SETTINGS = args.instruqt
 
+# Use ES_URL for both regular and Instruqt modes
+ES_URL = os.getenv('ES_URL')  # expects full URL including scheme (http/https) and port (:443)
+
 if INSTRUQT_WORKSHOP_SETTINGS:
     # Use Instruqt workshop settings
-    ES_URL = os.getenv('INSTRUQT_ES_URL')
     ES_USERNAME = os.getenv('INSTRUQT_ES_USERNAME')
     ES_PASSWORD = os.getenv('INSTRUQT_ES_PASSWORD')
     
     # For Instruqt, read API key from JSON file using jq pattern
     import subprocess
     try:
-        REGIONS = os.getenv('REGIONS')
-        if not REGIONS:
-            raise ValueError("REGIONS environment variable must be set for Instruqt workshop settings")
-        
         # Execute the jq command to extract API key
         result = subprocess.run([
-            'jq', '-r', '--arg', 'region', REGIONS, 
-            '.[$region].credentials.api_key', '/tmp/project_results.json'
+            'jq', '-r', '.[].credentials.api_key', '/tmp/project_results.json'
         ], capture_output=True, text=True, check=True)
         
         ES_API_KEY = result.stdout.strip()
@@ -55,14 +52,13 @@ if INSTRUQT_WORKSHOP_SETTINGS:
         
         USE_PASSWORD_AUTH = False  # Use API key auth for Instruqt
         print("🎓 Using Instruqt workshop settings for Elasticsearch connection")
-        print(f"🔑 API key extracted from JSON file for region: {REGIONS}")
+        print("🔑 API key extracted from JSON file")
     except subprocess.CalledProcessError as e:
         raise ValueError(f"Failed to extract API key from JSON file: {e}")
     except FileNotFoundError:
         raise ValueError("jq command not found. Please install jq for Instruqt workshop settings")
 else:
     # Use regular settings
-    ES_URL = os.getenv('ES_URL')  # expects full URL including scheme (http/https) and port (:443) 
     ES_API_KEY = os.getenv('ES_API_KEY')
     ES_USERNAME = os.getenv('ES_USERNAME')
     ES_PASSWORD = os.getenv('ES_PASSWORD')
@@ -124,10 +120,7 @@ print("🔧 Initializing Elasticsearch connection...")
 
 # Connect to Elasticsearch
 if not ES_URL:
-    if INSTRUQT_WORKSHOP_SETTINGS:
-        raise ValueError("INSTRUQT_ES_URL environment variable must be set when INSTRUQT_WORKSHOP_SETTINGS=true")
-    else:
-        raise ValueError("ES_URL environment variable must be set")
+    raise ValueError("ES_URL environment variable must be set")
 
 if USE_PASSWORD_AUTH:
     # Use username/password authentication
@@ -221,7 +214,7 @@ def download_and_parallel_bulk_load(properties_url=None):
     error_count = 0
     
     # Use smaller chunk size for Instruqt to avoid 413 errors
-    chunk_size = 50 if args.instruqt else 500
+    chunk_size = 10 if args.instruqt else 500
     
     for ok, result in helpers.parallel_bulk(
         es,
@@ -263,15 +256,90 @@ def download_and_parallel_bulk_load(properties_url=None):
         print(f"⚠️ Expected {expected_count} documents, but {final_count} were indexed.")
         return False
 
+def bulk_load_from_memory(data_lines):
+    """Bulk load data from memory (for retry attempts)"""
+    print("🚀 Starting parallel bulk indexing from memory...")
+    success_count = 0
+    error_count = 0
+    
+    # Use smaller chunk size for Instruqt to avoid 413 errors
+    chunk_size = 10 if args.instruqt else 500
+    
+    def generate_actions_from_memory():
+        doc_count = 0
+        for line in data_lines:
+            doc = json.loads(line)
+            doc_count += 1
+            if doc_count % 1000 == 0:
+                print(f"📊 Processed {doc_count} documents...")
+            yield {
+                "_index": INDEX_NAME,
+                "_source": doc
+            }
+        print(f"📊 Total documents to index: {doc_count}")
+    
+    for ok, result in helpers.parallel_bulk(
+        es,
+        actions=generate_actions_from_memory(),
+        thread_count=4,
+        chunk_size=chunk_size,
+        request_timeout=60
+    ):
+        if ok:
+            success_count += 1
+            if success_count % 1000 == 0:
+                print(f"✅ Successfully indexed {success_count} documents...")
+        else:
+            error_count += 1
+            if error_count % 100 == 0:
+                print(f"❌ Encountered {error_count} errors...")
+
+    print(f"✅ Successfully indexed {success_count} documents into '{INDEX_NAME}' using parallel_bulk")
+    if error_count > 0:
+        print(f"⚠️ Encountered {error_count} errors during indexing")
+    
+    # Add delay for Instruqt to allow documents to be available for counting
+    if args.instruqt:
+        print("⏳ Waiting 20 seconds for documents to be available for counting...")
+        time.sleep(20)
+    
+    # Verify the final document count
+    final_count = es.count(index=INDEX_NAME)['count']
+    # For Instruqt mode, always expect 500 documents since it uses the 500-line dataset
+    if args.instruqt:
+        expected_count = 500
+    else:
+        expected_count = get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset)
+    print(f"📊 Final document count in '{INDEX_NAME}': {final_count}")
+    if final_count == expected_count:
+        print(f"✅ Success! Expected {expected_count} documents were indexed.")
+        return True
+    else:
+        print(f"⚠️ Expected {expected_count} documents, but {final_count} were indexed.")
+        return False
+
 def retry_ingestion_with_instruqt_logic(dataset_url, max_retries=5):
     """Retry ingestion logic specifically for Instruqt workshop settings"""
+    print(f"📥 Downloading property data from {dataset_url}...")
+    response = requests.get(dataset_url, stream=True)
+    response.raise_for_status()
+    print("✅ Data download completed successfully")
+    
+    # Store the data in memory for reuse
+    data_lines = []
+    for line in response.iter_lines():
+        if line:
+            data_lines.append(line.decode("utf-8"))
+    
+    print(f"📊 Downloaded {len(data_lines)} documents for retry attempts")
+    
     for attempt in range(1, max_retries + 1):
         print(f"🔄 Attempt {attempt}/{max_retries} for Instruqt ingestion...")
         
         try:
-            # Create index and ingest data
+            # Create index and ingest data from memory
             create_properties_index()
-            success = download_and_parallel_bulk_load(dataset_url)
+            success = bulk_load_from_memory(data_lines)
             
             if success:
                 print(f"✅ Success on attempt {attempt}!")
