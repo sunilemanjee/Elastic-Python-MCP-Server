@@ -83,7 +83,7 @@ The data ingestion section created a key with broader server privleges like crea
 
 ## Requirements
 
-- Python 3.x
+- Python => 3.10
 - Elasticsearch Serverless instance
 - Google Maps API key
 - Required Python packages (see requirements.txt)
@@ -155,10 +155,10 @@ nano env_config.sh  # or use your preferred editor
 3. Set up the Python virtual environment:
 ```bash
 # Create virtual environment
-python3 -m venv venv
+python3.11 -m venv venv
 
 # Activate virtual environment
-source venv/bin/activate
+source venv/bin/activate ##on macbook it may be .venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
