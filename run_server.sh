@@ -49,10 +49,14 @@ fi
 # Run the server
 if [ "$BACKGROUND" = true ]; then
     echo "Starting Elastic MCP Server in background..."
-    nohup python elastic_mcp_server.py > elastic_mcp_server.log 2>&1 &
+    
+    # Create logs directory if it doesn't exist
+    mkdir -p logs
+    
+    nohup python elastic_mcp_server.py > logs/elastic_mcp_server.log 2>&1 &
     PID=$!
     echo "Server started with PID: $PID"
-    echo "Logs are being written to: elastic_mcp_server.log"
+    echo "Logs are being written to: logs/elastic_mcp_server.log"
     echo "To stop the server, run: kill $PID"
     echo "Or use: pkill -f elastic_mcp_server.py"
 else
