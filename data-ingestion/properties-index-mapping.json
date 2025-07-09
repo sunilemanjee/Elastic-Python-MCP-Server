@@ -29,7 +29,7 @@
         "inference_id": ".multilingual-e5-small-elasticsearch",
         "model_settings": {
           "task_type": "text_embedding",
-          "dimensions": 386,
+          "dimensions": 384,
           "similarity": "cosine",
           "element_type": "float"
          

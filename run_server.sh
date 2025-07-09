@@ -46,6 +46,19 @@ if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
     exit 1
 fi
 
+# Get the port from environment variable or use default
+MCP_PORT=${MCP_PORT:-8001}
+
+# Kill any process running on the MCP port
+echo "Checking for processes running on port $MCP_PORT..."
+if lsof -ti:$MCP_PORT > /dev/null 2>&1; then
+    echo "Found process(es) running on port $MCP_PORT. Killing them..."
+    lsof -ti:$MCP_PORT | xargs kill -9
+    echo "Killed process(es) on port $MCP_PORT"
+else
+    echo "No processes found running on port $MCP_PORT"
+fi
+
 # Run the server
 if [ "$BACKGROUND" = true ]; then
     echo "Starting Elastic MCP Server in background..."
