@@ -1,5 +1,27 @@
 #!/bin/bash
 
+# Parse command line arguments
+BACKGROUND=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -b|--background)
+            BACKGROUND=true
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 [-b|--background] [-h|--help]"
+            echo "  -b, --background  Run server in background"
+            echo "  -h, --help        Show this help message"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option $1"
+            echo "Use -h or --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
 # Load environment variables from env_config.sh
 if [ -f env_config.sh ]; then
     source env_config.sh
@@ -25,4 +47,15 @@ if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
 fi
 
 # Run the server
-python elastic_mcp_server.py 
+if [ "$BACKGROUND" = true ]; then
+    echo "Starting Elastic MCP Server in background..."
+    nohup python elastic_mcp_server.py > elastic_mcp_server.log 2>&1 &
+    PID=$!
+    echo "Server started with PID: $PID"
+    echo "Logs are being written to: elastic_mcp_server.log"
+    echo "To stop the server, run: kill $PID"
+    echo "Or use: pkill -f elastic_mcp_server.py"
+else
+    echo "Starting Elastic MCP Server in foreground..."
+    python elastic_mcp_server.py 
+fi 
