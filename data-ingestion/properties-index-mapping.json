@@ -11,7 +11,8 @@
       "body_content": {
         "type": "text",
         "copy_to": [
-          "body_content_semantic"
+          "body_content_semantic",
+          "body_content_e5"
         ]
       },
       "body_content_phrase": {
