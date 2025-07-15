@@ -19,6 +19,8 @@ parser.add_argument('--use-small-5k-dataset', action='store_true',
                    help='Use the smaller 5000-line dataset instead of the full dataset')
 parser.add_argument('--use-500-dataset', action='store_true',
                    help='Use the tiny 500-line dataset instead of the full dataset')
+parser.add_argument('--ingest-raw-500-dataset', action='store_true',
+                   help='Use raw index mapping (no ELSER) with 500-line dataset')
 parser.add_argument('--instruqt', action='store_true',
                    help='Use Instruqt workshop settings for Elasticsearch connection')
 args = parser.parse_args()
@@ -74,6 +76,14 @@ PROPERTIES_5000_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/prope
 PROPERTIES_500_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties-filtered-500-lines.json"
 SEARCH_TEMPLATE_FILE = os.path.join(os.path.dirname(__file__), "search-template.mustache")
 PROPERTIES_INDEX_MAPPING_FILE = os.path.join(os.path.dirname(__file__), "properties-index-mapping.json")
+RAW_INDEX_MAPPING_FILE = os.path.join(os.path.dirname(__file__), "raw-index-mapping.json")
+
+# Determine index name and mapping file based on arguments
+if args.ingest_raw_500_dataset:
+    INDEX_NAME = "raw_properties"
+    INDEX_MAPPING_FILE = RAW_INDEX_MAPPING_FILE
+else:
+    INDEX_MAPPING_FILE = PROPERTIES_INDEX_MAPPING_FILE
 
 def get_expected_document_count(use_small_dataset=False, use_tiny_dataset=False):
     """Return the expected number of documents based on the dataset being used"""
@@ -165,8 +175,11 @@ print("✅ Connected to Elasticsearch successfully")
 
 
 def create_properties_index():
-    print(f"🏗️ Creating properties index '{INDEX_NAME}' with ELSER semantic fields...")
-    mapping = load_index_mapping(PROPERTIES_INDEX_MAPPING_FILE)
+    if args.ingest_raw_500_dataset:
+        print(f"🏗️ Creating raw properties index '{INDEX_NAME}' (no ELSER semantic fields)...")
+    else:
+        print(f"🏗️ Creating properties index '{INDEX_NAME}' with ELSER semantic fields...")
+    mapping = load_index_mapping(INDEX_MAPPING_FILE)
 
     if es.indices.exists(index=INDEX_NAME):
         es.indices.delete(index=INDEX_NAME)
@@ -213,8 +226,8 @@ def download_and_parallel_bulk_load(properties_url=None):
     success_count = 0
     error_count = 0
     
-    # Use smaller chunk size for Instruqt to avoid 413 errors
-    chunk_size = 10 if args.instruqt else 500
+    # Use smaller chunk size for Instruqt or raw dataset to avoid 413 errors
+    chunk_size = 10 if (args.instruqt or args.ingest_raw_500_dataset) else 500
     
     for ok, result in helpers.parallel_bulk(
         es,
@@ -236,15 +249,15 @@ def download_and_parallel_bulk_load(properties_url=None):
     if error_count > 0:
         print(f"⚠️ Encountered {error_count} errors during indexing")
     
-    # Add delay for Instruqt to allow documents to be available for counting
-    if args.instruqt:
+    # Add delay for Instruqt or raw dataset to allow documents to be available for counting
+    if args.instruqt or args.ingest_raw_500_dataset:
         print("⏳ Waiting 20 seconds for documents to be available for counting...")
         time.sleep(20)
     
     # Verify the final document count
     final_count = es.count(index=INDEX_NAME)['count']
-    # For Instruqt mode, always expect 500 documents since it uses the 500-line dataset
-    if args.instruqt:
+    # For Instruqt mode or raw dataset mode, always expect 500 documents since they use the 500-line dataset
+    if args.instruqt or args.ingest_raw_500_dataset:
         expected_count = 500
     else:
         expected_count = get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset)
@@ -262,8 +275,8 @@ def bulk_load_from_memory(data_lines):
     success_count = 0
     error_count = 0
     
-    # Use smaller chunk size for Instruqt to avoid 413 errors
-    chunk_size = 10 if args.instruqt else 500
+    # Use smaller chunk size for Instruqt or raw dataset to avoid 413 errors
+    chunk_size = 10 if (args.instruqt or args.ingest_raw_500_dataset) else 500
     
     def generate_actions_from_memory():
         doc_count = 0
@@ -298,15 +311,15 @@ def bulk_load_from_memory(data_lines):
     if error_count > 0:
         print(f"⚠️ Encountered {error_count} errors during indexing")
     
-    # Add delay for Instruqt to allow documents to be available for counting
-    if args.instruqt:
+    # Add delay for Instruqt or raw dataset to allow documents to be available for counting
+    if args.instruqt or args.ingest_raw_500_dataset:
         print("⏳ Waiting 20 seconds for documents to be available for counting...")
         time.sleep(20)
     
     # Verify the final document count
     final_count = es.count(index=INDEX_NAME)['count']
-    # For Instruqt mode, always expect 500 documents since it uses the 500-line dataset
-    if args.instruqt:
+    # For Instruqt mode or raw dataset mode, always expect 500 documents since they use the 500-line dataset
+    if args.instruqt or args.ingest_raw_500_dataset:
         expected_count = 500
     else:
         expected_count = get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset)
@@ -319,7 +332,7 @@ def bulk_load_from_memory(data_lines):
         return False
 
 def retry_ingestion_with_instruqt_logic(dataset_url, max_retries=5):
-    """Retry ingestion logic specifically for Instruqt workshop settings"""
+    """Retry ingestion logic specifically for Instruqt workshop settings or raw dataset ingestion"""
     print(f"📥 Downloading property data from {dataset_url}...")
     response = requests.get(dataset_url, stream=True)
     response.raise_for_status()
@@ -334,7 +347,10 @@ def retry_ingestion_with_instruqt_logic(dataset_url, max_retries=5):
     print(f"📊 Downloaded {len(data_lines)} documents for retry attempts")
     
     for attempt in range(1, max_retries + 1):
-        print(f"🔄 Attempt {attempt}/{max_retries} for Instruqt ingestion...")
+        if args.instruqt:
+            print(f"🔄 Attempt {attempt}/{max_retries} for Instruqt ingestion...")
+        else:
+            print(f"🔄 Attempt {attempt}/{max_retries} for raw dataset ingestion...")
         
         try:
             # Create index and ingest data from memory
@@ -362,10 +378,91 @@ def retry_ingestion_with_instruqt_logic(dataset_url, max_retries=5):
                 print(f"❌ All {max_retries} attempts failed")
                 return False
 
+def create_raw_properties_index():
+    """Create and ingest data into raw_properties index"""
+    raw_index_name = "raw_properties"
+    print(f"🏗️ Creating raw properties index '{raw_index_name}' (no ELSER semantic fields)...")
+    mapping = load_index_mapping(RAW_INDEX_MAPPING_FILE)
+
+    if es.indices.exists(index=raw_index_name):
+        es.indices.delete(index=raw_index_name)
+        print(f"🗑️ Index '{raw_index_name}' deleted.")
+
+    es.indices.create(index=raw_index_name, body=mapping)
+    print(f"✅ Index '{raw_index_name}' created.")
+
+def ingest_raw_properties_data(dataset_url):
+    """Ingest data into raw_properties index"""
+    raw_index_name = "raw_properties"
+    print(f"📥 Downloading property data for raw index from {dataset_url}...")
+    response = requests.get(dataset_url, stream=True)
+    response.raise_for_status()
+    print("✅ Data download started successfully")
+
+    def generate_actions():
+        doc_count = 0
+        for line in response.iter_lines():
+            if line:
+                doc = json.loads(line.decode("utf-8"))
+                doc_count += 1
+                if doc_count % 1000 == 0:
+                    print(f"📊 Processed {doc_count} documents...")
+                yield {
+                    "_index": raw_index_name,
+                    "_source": doc
+                }
+        print(f"📊 Total documents to index: {doc_count}")
+
+    print("🚀 Starting parallel bulk indexing for raw properties...")
+    success_count = 0
+    error_count = 0
+    
+    # Use smaller chunk size for Instruqt to avoid 413 errors
+    chunk_size = 10
+    
+    for ok, result in helpers.parallel_bulk(
+        es,
+        actions=generate_actions(),
+        thread_count=4,
+        chunk_size=chunk_size,
+        request_timeout=60
+    ):
+        if ok:
+            success_count += 1
+            if success_count % 1000 == 0:
+                print(f"✅ Successfully indexed {success_count} documents...")
+        else:
+            error_count += 1
+            if error_count % 100 == 0:
+                print(f"❌ Encountered {error_count} errors...")
+
+    print(f"✅ Successfully indexed {success_count} documents into '{raw_index_name}' using parallel_bulk")
+    if error_count > 0:
+        print(f"⚠️ Encountered {error_count} errors during indexing")
+    
+    # Add delay for Instruqt to allow documents to be available for counting
+    print("⏳ Waiting 20 seconds for documents to be available for counting...")
+    time.sleep(20)
+    
+    # Verify the final document count
+    final_count = es.count(index=raw_index_name)['count']
+    expected_count = 500  # Always expect 500 documents for Instruqt
+    print(f"📊 Final document count in '{raw_index_name}': {final_count}")
+    if final_count == expected_count:
+        print(f"✅ Success! Expected {expected_count} documents were indexed in raw properties.")
+        return True
+    else:
+        print(f"⚠️ Expected {expected_count} documents, but {final_count} were indexed in raw properties.")
+        return False
+
 # Main execution logic based on command line arguments
 if __name__ == "__main__":
     # Determine which dataset URL to use
-    if args.instruqt:
+    if args.ingest_raw_500_dataset:
+        # When using raw index mapping, always use the 500-line dataset
+        dataset_url = PROPERTIES_500_URL
+        print("📊 Raw index mode: Using 500-line dataset")
+    elif args.instruqt:
         # When using Instruqt workshop settings, always use the 500-line dataset
         dataset_url = PROPERTIES_500_URL
         print("🎓 Instruqt mode: Using 500-line dataset")
@@ -390,12 +487,31 @@ if __name__ == "__main__":
     if args.full_ingestion:
         print("🎯 Running complete data ingestion pipeline...")
         if args.instruqt:
-            # Use retry logic for Instruqt
+            # Use retry logic for Instruqt and also create raw properties index
+            success = retry_ingestion_with_instruqt_logic(dataset_url)
+            if success:
+                # Also create and ingest raw properties index
+                print("🎯 Creating and ingesting raw properties index...")
+                create_raw_properties_index()
+                raw_success = ingest_raw_properties_data(dataset_url)
+                if raw_success:
+                    create_search_template()
+                    print("✅ Complete data ingestion pipeline complete!")
+                    print(f"📋 Final index '{INDEX_NAME}' is ready for semantic search")
+                    print(f"📋 Final index 'raw_properties' is ready for basic search (no ELSER)")
+                else:
+                    print("❌ Raw properties index creation failed")
+                    exit(1)
+            else:
+                print("❌ Data ingestion pipeline failed after all retry attempts")
+                exit(1)
+        elif args.ingest_raw_500_dataset:
+            # Use retry logic for raw dataset
             success = retry_ingestion_with_instruqt_logic(dataset_url)
             if success:
                 create_search_template()
                 print("✅ Complete data ingestion pipeline complete!")
-                print(f"📋 Final index '{INDEX_NAME}' is ready for semantic search")
+                print(f"📋 Final index '{INDEX_NAME}' is ready for basic search (no ELSER)")
             else:
                 print("❌ Data ingestion pipeline failed after all retry attempts")
                 exit(1)
@@ -411,7 +527,23 @@ if __name__ == "__main__":
     if args.recreate_index:
         print("🎯 Running recreate index operation...")
         if args.instruqt:
-            # Use retry logic for Instruqt
+            # Use retry logic for Instruqt and also create raw properties index
+            success = retry_ingestion_with_instruqt_logic(dataset_url)
+            if success:
+                # Also create and ingest raw properties index
+                print("🎯 Creating and ingesting raw properties index...")
+                create_raw_properties_index()
+                raw_success = ingest_raw_properties_data(dataset_url)
+                if raw_success:
+                    print("✅ Index recreation and data loading complete!")
+                else:
+                    print("❌ Raw properties index creation failed")
+                    exit(1)
+            else:
+                print("❌ Index recreation failed after all retry attempts")
+                exit(1)
+        elif args.ingest_raw_500_dataset:
+            # Use retry logic for raw dataset
             success = retry_ingestion_with_instruqt_logic(dataset_url)
             if success:
                 print("✅ Index recreation and data loading complete!")
@@ -429,12 +561,31 @@ if __name__ == "__main__":
     if not operations_run:
         print("🎯 Running complete property data ingestion...")
         if args.instruqt:
-            # Use retry logic for Instruqt
+            # Use retry logic for Instruqt and also create raw properties index
+            success = retry_ingestion_with_instruqt_logic(dataset_url)
+            if success:
+                # Also create and ingest raw properties index
+                print("🎯 Creating and ingesting raw properties index...")
+                create_raw_properties_index()
+                raw_success = ingest_raw_properties_data(dataset_url)
+                if raw_success:
+                    create_search_template()
+                    print("🎉 Property data ingestion and processing complete!")
+                    print(f"📋 Final index '{INDEX_NAME}' is ready for semantic search")
+                    print(f"📋 Final index 'raw_properties' is ready for basic search (no ELSER)")
+                else:
+                    print("❌ Raw properties index creation failed")
+                    exit(1)
+            else:
+                print("❌ Property data ingestion failed after all retry attempts")
+                exit(1)
+        elif args.ingest_raw_500_dataset:
+            # Use retry logic for raw dataset
             success = retry_ingestion_with_instruqt_logic(dataset_url)
             if success:
                 create_search_template()
                 print("🎉 Property data ingestion and processing complete!")
-                print(f"📋 Final index '{INDEX_NAME}' is ready for semantic search")
+                print(f"📋 Final index '{INDEX_NAME}' is ready for basic search (no ELSER)")
             else:
                 print("❌ Property data ingestion failed after all retry attempts")
                 exit(1)

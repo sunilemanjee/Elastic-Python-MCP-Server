@@ -11,6 +11,7 @@ show_usage() {
     echo "  --recreate-index    Delete and recreate the properties index (no data processing)"
     echo "  --use-small-5k-dataset Use the smaller 5000-line dataset instead of the full dataset"
     echo "  --use-500-dataset   Use the tiny 500-line dataset instead of the full dataset"
+    echo "  --ingest-raw-500-dataset Use raw index mapping (no ELSER) with 500-line dataset"
     echo "  --instruqt          Use Instruqt workshop settings for Elasticsearch connection"
     echo "  -h, --help          Show this help message"
     echo ""
@@ -25,6 +26,7 @@ show_usage() {
     echo "  $0 --recreate-index   # Delete and recreate properties index"
     echo "  $0 --use-small-5k-dataset # Run entire script with smaller dataset"
     echo "  $0 --use-500-dataset  # Run entire script with tiny dataset"
+    echo "  $0 --ingest-raw-500-dataset # Run ingestion with raw index mapping and 500-line dataset"
     echo "  $0 --instruqt         # Run entire script with Instruqt workshop settings"
     echo "  $0 --searchtemplate --full-ingestion  # Create search templates and run ingestion"
     echo "  $0 --full-ingestion --reindex         # Run ingestion and reindex"
@@ -40,6 +42,7 @@ REINDEX_ONLY=false
 RECREATE_INDEX_ONLY=false
 USE_SMALL_DATASET=false
 USE_TINY_DATASET=false
+INGEST_RAW_500_DATASET=false
 INSTRUQT_ONLY=false
 
 while [[ $# -gt 0 ]]; do
@@ -66,6 +69,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --use-500-dataset)
             USE_TINY_DATASET=true
+            shift
+            ;;
+        --ingest-raw-500-dataset)
+            INGEST_RAW_500_DATASET=true
             shift
             ;;
         --instruqt)
@@ -132,6 +139,11 @@ if [ "$SEARCHTEMPLATE_ONLY" = true ] || [ "$FULL_INGESTION_ONLY" = true ] || [ "
         CMD="$CMD --use-500-dataset"
     fi
     
+    if [ "$INGEST_RAW_500_DATASET" = true ]; then
+        echo "  - Use raw index mapping with 500-line dataset"
+        CMD="$CMD --ingest-raw-500-dataset"
+    fi
+    
     if [ "$INSTRUQT_ONLY" = true ]; then
         echo "  - Use Instruqt workshop settings"
         CMD="$CMD --instruqt"
@@ -149,6 +161,15 @@ elif [ "$USE_TINY_DATASET" = true ]; then
     # Only --use-500-dataset was specified, run entire script with tiny dataset
     echo "Running complete property data ingestion with tiny dataset..."
     CMD="$CMD --use-500-dataset"
+    
+    if [ "$INSTRUQT_ONLY" = true ]; then
+        echo "  - Use Instruqt workshop settings"
+        CMD="$CMD --instruqt"
+    fi
+elif [ "$INGEST_RAW_500_DATASET" = true ]; then
+    # Only --ingest-raw-500-dataset was specified, run entire script with raw index mapping
+    echo "Running complete property data ingestion with raw index mapping and 500-line dataset..."
+    CMD="$CMD --ingest-raw-500-dataset"
     
     if [ "$INSTRUQT_ONLY" = true ]; then
         echo "  - Use Instruqt workshop settings"

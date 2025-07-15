@@ -11,14 +11,14 @@
       "body_content": {
         "type": "text",
         "copy_to": [
-          "body_content_semantic",
+          "body_content_elser",
           "body_content_e5"
         ]
       },
       "body_content_phrase": {
         "type": "text"
       },
-      "body_content_semantic": {
+      "body_content_elser": {
         "type": "semantic_text",
         "inference_id": ".elser-2-elasticsearch",
         "model_settings": {
