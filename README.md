@@ -122,6 +122,8 @@ The following environment variables need to be configured in `env_config.sh`:
 - `GOOGLE_MAPS_API_KEY`: Your Google Maps API key
 - `PROPERTIES_SEARCH_TEMPLATE`: Search template ID (default: "properties-search-template")
 - `ELSER_INFERENCE_ID`: ELSER inference endpoint ID (default: ".elser-2-elasticsearch")
+- `E5_INFERENCE_ID`: E5 inference endpoint ID (default: ".multilingual-e5-small-elasticsearch")
+- `RERANK_INFERENCE_ID`: Rerank inference endpoint ID (default: ".rerank-v1-elasticsearch")
 - `ES_INDEX`: Elasticsearch index name (default: "properties")
 - `MCP_PORT`: Port number for the MCP server (default: 8001)
 

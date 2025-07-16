@@ -9,7 +9,7 @@
         "type": "integer"
       },
       "body_content": {
-        "type": "text",
+        "type": "text"
       },
       "body_content_phrase": {
         "type": "text"

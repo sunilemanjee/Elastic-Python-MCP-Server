@@ -69,6 +69,8 @@ else:
 INDEX_NAME = os.getenv('ES_INDEX', "properties")
 TEMPLATE_ID = os.getenv('PROPERTIES_SEARCH_TEMPLATE', "properties-search-template")
 ELSER_INFERENCE_ID = os.getenv('ELSER_INFERENCE_ID', ".elser-2-elasticsearch")
+E5_INFERENCE_ID = os.getenv('E5_INFERENCE_ID', ".multilingual-e5-small-elasticsearch")
+RERANK_INFERENCE_ID = os.getenv('RERANK_INFERENCE_ID', ".rerank-v1-elasticsearch")
 
 # Constants
 PROPERTIES_FULL_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties.json"
@@ -115,7 +117,14 @@ def load_index_mapping(mapping_file):
     """Load index mapping from external JSON file"""
     try:
         with open(mapping_file, 'r') as f:
-            return json.load(f)
+            mapping_content = f.read()
+        
+        # Replace placeholder values with environment variables
+        mapping_content = mapping_content.replace('"{{ELSER_INFERENCE_ID}}"', f'"{ELSER_INFERENCE_ID}"')
+        mapping_content = mapping_content.replace('"{{E5_INFERENCE_ID}}"', f'"{E5_INFERENCE_ID}"')
+        mapping_content = mapping_content.replace('"{{RERANK_INFERENCE_ID}}"', f'"{RERANK_INFERENCE_ID}"')
+        
+        return json.loads(mapping_content)
     except FileNotFoundError:
         print(f"❌ Index mapping file not found: {mapping_file}")
         raise

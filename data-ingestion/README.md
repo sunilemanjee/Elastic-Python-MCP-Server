@@ -146,7 +146,9 @@ Required variables:
 
 Optional variables (have defaults):
 - `PROPERTIES_SEARCH_TEMPLATE`: Search template ID
-- `ELSER_INFERENCE_ID`: ELSER inference endpoint ID  
+- `ELSER_INFERENCE_ID`: ELSER inference endpoint ID
+- `E5_INFERENCE_ID`: E5 inference endpoint ID
+- `RERANK_INFERENCE_ID`: Rerank inference endpoint ID
 - `ES_INDEX`: Elasticsearch index name
 
 
@@ -282,7 +284,6 @@ The setup script automatically installs:
 The script uses these environment variables when the `--instruqt` flag is specified:
 
 ```bash
-export INSTRUQT_ES_URL="http://kubernetes-vm:9200"
 export INSTRUQT_ES_USERNAME="elastic"
 export INSTRUQT_ES_PASSWORD=""  # Usually empty in Instruqt environments
 ```
@@ -292,7 +293,6 @@ Edit your `env_config.sh` file to include the Instruqt settings:
 
 ```bash
 # Instruqt workshop settings
-export INSTRUQT_ES_URL="http://kubernetes-vm:9200"
 export INSTRUQT_ES_USERNAME="elastic"
 export INSTRUQT_ES_PASSWORD=""
 ```
@@ -319,9 +319,9 @@ The script will automatically detect the `--instruqt` flag and use the appropria
 ```
 
 **Important Notes for Instruqt Workshop:**
+- The script uses the same `ES_URL` as regular mode (set this to your Instruqt Elasticsearch URL)
 - The script automatically uses password authentication (no API key required)
 - Password can be empty in Instruqt workshop environments
-- The connection URL typically points to the internal Kubernetes VM
 - All other functionality remains the same (ELSER processing, data ingestion, etc.)
 - The `--instruqt` flag can be combined with any other operation flags
 
