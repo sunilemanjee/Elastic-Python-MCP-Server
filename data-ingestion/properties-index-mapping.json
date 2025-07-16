@@ -37,7 +37,7 @@
         },
         "index_options": {
           "dense_vector": {
-            "type": "int4_flat"
+            "type": "flat"
           }
         }
       },
