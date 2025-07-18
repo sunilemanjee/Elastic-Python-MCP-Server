@@ -21,7 +21,9 @@ https://github.com/user-attachments/assets/df498631-fb16-4ba5-b1fd-c14670213d73
 - **Elasticsearch Integration**: 
   - Connects to Elasticsearch Serverless
   - Uses ELSER (Elastic Learned Sparse Encoder) for semantic search
+  - Uses E5 (multilingual-e5-small) for additional semantic capabilities
   - Supports custom search templates
+  - Automatic monitoring and waking of inference endpoints
 
 ## Project Structure
 
@@ -115,7 +117,7 @@ The data ingestion section created a key with broader server privleges like crea
 
 ## Environment Variables
 
-The following environment variables need to be configured in `env_config.sh`:
+The following environment variables need to be configured in `env_config.sh`. The inference endpoint IDs can be overridden by setting the corresponding environment variables before sourcing the config file:
 
 - `ES_URL`: Your Elasticsearch Serverless URL
 - `ES_API_KEY`: Your Elasticsearch API key
@@ -126,6 +128,20 @@ The following environment variables need to be configured in `env_config.sh`:
 - `RERANK_INFERENCE_ID`: Rerank inference endpoint ID (default: ".rerank-v1-elasticsearch")
 - `ES_INDEX`: Elasticsearch index name (default: "properties")
 - `MCP_PORT`: Port number for the MCP server (default: 8001)
+
+### Overriding Inference Endpoint IDs
+
+You can override the default inference endpoint IDs by setting environment variables before sourcing the config:
+
+```bash
+# Set custom inference endpoint IDs
+export ELSER_INFERENCE_ID=".custom-elser-endpoint"
+export E5_INFERENCE_ID=".custom-e5-endpoint"
+export RERANK_INFERENCE_ID=".custom-rerank-endpoint"
+
+# Source the config (will use your custom values)
+source env_config.sh
+```
 
 ## Setup
 
@@ -185,11 +201,12 @@ curl -v http://localhost:8001/sse
 
 ## API Endpoints
 
-The server provides several MCP tools:
+The server provides several MCP tools that can be called by frontend applications or other MCP clients:
 
-1. `get_properties_template_params`: Returns the required parameters for the properties search template
-2. `geocode_location`: Converts a location string into geographic coordinates
-3. `search_template`: Performs property searches using the configured search template
+1. `wake_inference_endpoints`: Wakes up ELSER and E5 inference endpoints (returns "Endpoints Awakened" when successful)
+2. `get_properties_template_params`: Returns the required parameters for the properties search template
+3. `geocode_location`: Converts a location string into geographic coordinates
+4. `search_template`: Performs property searches using the configured search template
 
 ## Search Parameters
 

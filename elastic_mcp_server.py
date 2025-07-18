@@ -49,7 +49,8 @@ class ElasticsearchConfig:
         ca_cert: Optional[str] = None,
         google_maps_api_key: Optional[str] = None,
         properties_search_template: str = "properties-search-template",
-        inference_id: str = ".elser-2-elasticsearch"
+        inference_id: str = ".elser-2-elasticsearch",
+        e5_inference_id: str = ".multilingual-e5-small-elasticsearch"
     ):
         if not url:
             raise ValueError("Elasticsearch URL cannot be empty")
@@ -68,6 +69,7 @@ class ElasticsearchConfig:
         self.google_maps_api_key = google_maps_api_key
         self.properties_search_template = properties_search_template
         self.inference_id = inference_id
+        self.e5_inference_id = e5_inference_id
 
 def create_elasticsearch_mcp_server(config: ElasticsearchConfig) -> FastMCP:
     """Create and configure the MCP server with Elasticsearch integration."""
@@ -104,28 +106,101 @@ def create_elasticsearch_mcp_server(config: ElasticsearchConfig) -> FastMCP:
         on_duplicate_tools="error"
     )
 
-    # Create a background task for checking inference endpoint
-    async def check_inference_endpoint():
-        """Periodically check if the inference endpoint is available."""
+    # Create a background task for checking inference endpoints
+    async def check_inference_endpoints():
+        """Periodically check if the inference endpoints are available."""
         while True:
+            # Check ELSER inference endpoint
             if config.inference_id:
-                logger.info(f"Checking inference endpoint: {config.inference_id}")
+                logger.info(f"Checking ELSER inference endpoint: {config.inference_id}")
                 try:
                     response = es_client.inference.inference(
                         inference_id=config.inference_id,
                         input=['wake up']
                     )
-                    logger.info(f"Inference endpoint is ready: {config.inference_id}")
+                    logger.info(f"ELSER inference endpoint is ready: {config.inference_id}")
                 except Exception as e:
-                    logger.error(f"Failed to connect to inference endpoint: {str(e)}")
-                    logger.error(f"Inference endpoint {config.inference_id} is not available")
+                    logger.error(f"Failed to connect to ELSER inference endpoint: {str(e)}")
+                    logger.error(f"ELSER inference endpoint {config.inference_id} is not available")
+            
+            # Check E5 inference endpoint
+            if config.e5_inference_id:
+                logger.info(f"Checking E5 inference endpoint: {config.e5_inference_id}")
+                try:
+                    response = es_client.inference.inference(
+                        inference_id=config.e5_inference_id,
+                        input=['wake up']
+                    )
+                    logger.info(f"E5 inference endpoint is ready: {config.e5_inference_id}")
+                except Exception as e:
+                    logger.error(f"Failed to connect to E5 inference endpoint: {str(e)}")
+                    logger.error(f"E5 inference endpoint {config.e5_inference_id} is not available")
             
             # Wait for 5 minutes before next check
             await asyncio.sleep(300)  # 300 seconds = 5 minutes
 
     # Start the background task
     loop = asyncio.get_event_loop()
-    loop.create_task(check_inference_endpoint())
+    loop.create_task(check_inference_endpoints())
+    
+    @mcp.tool()
+    async def wake_inference_endpoints() -> Dict[str, Any]:
+        """Wake up ELSER and E5 inference endpoints. Returns 'Endpoints Awakened' when successful."""
+        results = []
+        
+        # Wake up ELSER inference endpoint
+        if config.inference_id:
+            logger.info(f"Manually waking up ELSER inference endpoint: {config.inference_id}")
+            try:
+                response = es_client.inference.inference(
+                    inference_id=config.inference_id,
+                    input=['wake up']
+                )
+                logger.info(f"ELSER inference endpoint is ready: {config.inference_id}")
+                results.append(f"✅ ELSER inference endpoint ({config.inference_id}) is ready")
+            except Exception as e:
+                logger.error(f"Failed to wake up ELSER inference endpoint: {str(e)}")
+                results.append(f"❌ ELSER inference endpoint ({config.inference_id}) is not available: {str(e)}")
+        else:
+            results.append("⚠️ ELSER inference endpoint ID not configured")
+        
+        # Wake up E5 inference endpoint
+        if config.e5_inference_id:
+            logger.info(f"Manually waking up E5 inference endpoint: {config.e5_inference_id}")
+            try:
+                response = es_client.inference.inference(
+                    inference_id=config.e5_inference_id,
+                    input=['wake up']
+                )
+                logger.info(f"E5 inference endpoint is ready: {config.e5_inference_id}")
+                results.append(f"✅ E5 inference endpoint ({config.e5_inference_id}) is ready")
+            except Exception as e:
+                logger.error(f"Failed to wake up E5 inference endpoint: {str(e)}")
+                results.append(f"❌ E5 inference endpoint ({config.e5_inference_id}) is not available: {str(e)}")
+        else:
+            results.append("⚠️ E5 inference endpoint ID not configured")
+        
+        # Determine overall status
+        all_ready = all("✅" in result for result in results if "✅" in result or "⚠️" not in result)
+        
+        # Create user-friendly message
+        if all_ready:
+            status_message = "Endpoints Awakened"
+        else:
+            status_message = "Some endpoints failed to awaken"
+        
+        return {
+            "content": [
+                {"type": "text", "text": status_message},
+                {"type": "text", "text": "\n".join(results)}
+            ],
+            "data": {
+                "status": "awakened" if all_ready else "partial_failure",
+                "message": status_message,
+                "elser_status": "ready" if config.inference_id and "✅" in results[0] else "not_available",
+                "e5_status": "ready" if config.e5_inference_id and "✅" in results[1] else "not_available"
+            }
+        }
     
     @mcp.tool()
     async def get_properties_template_params() -> Dict[str, Any]:
@@ -374,7 +449,8 @@ def main():
         ca_cert=os.getenv("ES_CA_CERT", ""),
         google_maps_api_key=os.getenv("GOOGLE_MAPS_API_KEY", ""),
         properties_search_template=os.getenv("PROPERTIES_SEARCH_TEMPLATE", ""),
-        inference_id=os.getenv("ELSER_INFERENCE_ID", "")
+        inference_id=os.getenv("ELSER_INFERENCE_ID", ""),
+        e5_inference_id=os.getenv("E5_INFERENCE_ID", "")
     )
     
     server = create_elasticsearch_mcp_server(config)
