@@ -36,7 +36,6 @@ This script loads property data into Elasticsearch for the intelligent property 
    # Or run specific operations
    ./run-ingestion.sh --full-ingestion    # Complete pipeline
    ./run-ingestion.sh --searchtemplate    # Only create search templates
-   ./run-ingestion.sh --reindex           # Only reindex (requires raw index)
    ./run-ingestion.sh --recreate-index    # Recreate indices and load raw data
    ./run-ingestion.sh --use-small-5k-dataset # Run everything with smaller dataset
    ./run-ingestion.sh --use-500-dataset   # Run everything with tiny dataset
@@ -57,11 +56,7 @@ The ingestion script supports several operation modes:
 - Creates indices, downloads data, processes with ELSER
 - Most comprehensive operation
 
-### `--reindex`
-- Only performs reindexing from raw to processed index
-- **Recreates the properties index** to ensure clean state with latest mapping
-- Requires existing raw index
-- Useful for reprocessing data with ELSER
+
 
 ### `--recreate-index`
 - Deletes and recreates both raw and properties indices
@@ -91,7 +86,6 @@ The ingestion script supports several operation modes:
 You can combine flags to run multiple operations:
 ```bash
 ./run-ingestion.sh --searchtemplate --full-ingestion
-./run-ingestion.sh --full-ingestion --reindex
 ./run-ingestion.sh --full-ingestion --use-small-5k-dataset
 ./run-ingestion.sh --full-ingestion --use-500-dataset
 ./run-ingestion.sh --full-ingestion --instruqt
@@ -189,7 +183,6 @@ If you prefer to run manually:
    # Or specific operations
    python ingest-properties.py --searchtemplate
    python ingest-properties.py --full-ingestion
-   python ingest-properties.py --reindex
    python ingest-properties.py --recreate-index
    python ingest-properties.py --use-small-5k-dataset
    python ingest-properties.py --use-500-dataset
@@ -307,7 +300,6 @@ Use the `--instruqt` flag to enable Instruqt workshop mode:
 # Or run specific operations with Instruqt workshop settings
 ./run-ingestion.sh --full-ingestion --instruqt
 ./run-ingestion.sh --searchtemplate --instruqt
-./run-ingestion.sh --reindex --instruqt
 ./run-ingestion.sh --use-small-5k-dataset --instruqt
 ./run-ingestion.sh --use-500-dataset --instruqt
 ```

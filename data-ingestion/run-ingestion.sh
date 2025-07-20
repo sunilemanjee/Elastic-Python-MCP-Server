@@ -7,7 +7,6 @@ show_usage() {
     echo "Options:"
     echo "  --searchtemplate    Run the search template creation part"
     echo "  --full-ingestion    Run the complete data ingestion pipeline (create indices, download data, process with ELSER)"
-    echo "  --reindex           Run the reindex operation (recreates properties index, requires existing raw index)"
     echo "  --recreate-index    Delete and recreate the properties index (no data processing)"
     echo "  --use-small-5k-dataset Use the smaller 5000-line dataset instead of the full dataset"
     echo "  --use-500-dataset   Use the tiny 500-line dataset instead of the full dataset"
@@ -22,23 +21,21 @@ show_usage() {
     echo "  $0                    # Run entire script"
     echo "  $0 --searchtemplate   # Only create search templates"
     echo "  $0 --full-ingestion   # Run complete data ingestion pipeline"
-    echo "  $0 --reindex          # Only reindex (requires raw index to exist)"
     echo "  $0 --recreate-index   # Delete and recreate properties index"
     echo "  $0 --use-small-5k-dataset # Run entire script with smaller dataset"
     echo "  $0 --use-500-dataset  # Run entire script with tiny dataset"
     echo "  $0 --ingest-raw-500-dataset # Run ingestion with raw index mapping and 500-line dataset"
     echo "  $0 --instruqt         # Run entire script with Instruqt workshop settings"
     echo "  $0 --searchtemplate --full-ingestion  # Create search templates and run ingestion"
-    echo "  $0 --full-ingestion --reindex         # Run ingestion and reindex"
     echo "  $0 --full-ingestion --use-small-5k-dataset # Run ingestion with smaller dataset"
     echo "  $0 --full-ingestion --use-500-dataset  # Run ingestion with tiny dataset"
     echo "  $0 --full-ingestion --instruqt        # Run ingestion with Instruqt workshop settings"
+}
 }
 
 # Parse command line arguments
 SEARCHTEMPLATE_ONLY=false
 FULL_INGESTION_ONLY=false
-REINDEX_ONLY=false
 RECREATE_INDEX_ONLY=false
 USE_SMALL_DATASET=false
 USE_TINY_DATASET=false
@@ -53,10 +50,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         --full-ingestion)
             FULL_INGESTION_ONLY=true
-            shift
-            ;;
-        --reindex)
-            REINDEX_ONLY=true
             shift
             ;;
         --recreate-index)
@@ -105,7 +98,7 @@ source ../env_config.sh
 CMD="python ingest-properties.py"
 
 # Check which flags were specified and build the command accordingly
-if [ "$SEARCHTEMPLATE_ONLY" = true ] || [ "$FULL_INGESTION_ONLY" = true ] || [ "$REINDEX_ONLY" = true ] || [ "$RECREATE_INDEX_ONLY" = true ]; then
+if [ "$SEARCHTEMPLATE_ONLY" = true ] || [ "$FULL_INGESTION_ONLY" = true ] || [ "$RECREATE_INDEX_ONLY" = true ]; then
     # At least one specific operation flag was specified, so we'll run specific operations
     echo "Running specified operations:"
     
@@ -117,11 +110,6 @@ if [ "$SEARCHTEMPLATE_ONLY" = true ] || [ "$FULL_INGESTION_ONLY" = true ] || [ "
     if [ "$FULL_INGESTION_ONLY" = true ]; then
         echo "  - Complete data ingestion pipeline"
         CMD="$CMD --full-ingestion"
-    fi
-    
-    if [ "$REINDEX_ONLY" = true ]; then
-        echo "  - Reindex operation"
-        CMD="$CMD --reindex"
     fi
     
     if [ "$RECREATE_INDEX_ONLY" = true ]; then
