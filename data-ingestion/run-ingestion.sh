@@ -12,6 +12,7 @@ show_usage() {
     echo "  --use-500-dataset   Use the tiny 500-line dataset instead of the full dataset"
     echo "  --ingest-raw-500-dataset Use raw index mapping (no ELSER) with 500-line dataset"
     echo "  --instruqt          Use Instruqt workshop settings for Elasticsearch connection"
+    echo "  --reingest-instruqt-with-endpoints Delete properties index, recreate with Instruqt mapping, and reingest 500-line dataset"
     echo "  -h, --help          Show this help message"
     echo ""
     echo "Multiple flags can be combined to run specific operations."
@@ -30,6 +31,7 @@ show_usage() {
     echo "  $0 --full-ingestion --use-small-5k-dataset # Run ingestion with smaller dataset"
     echo "  $0 --full-ingestion --use-500-dataset  # Run ingestion with tiny dataset"
     echo "  $0 --full-ingestion --instruqt        # Run ingestion with Instruqt workshop settings"
+    echo "  $0 --reingest-instruqt-with-endpoints # Delete properties index, recreate with Instruqt mapping, and reingest 500-line dataset"
 }
 }
 
@@ -41,6 +43,7 @@ USE_SMALL_DATASET=false
 USE_TINY_DATASET=false
 INGEST_RAW_500_DATASET=false
 INSTRUQT_ONLY=false
+REINGEST_INSTRUQT_WITH_ENDPOINTS=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -70,6 +73,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --instruqt)
             INSTRUQT_ONLY=true
+            shift
+            ;;
+        --reingest-instruqt-with-endpoints)
+            REINGEST_INSTRUQT_WITH_ENDPOINTS=true
             shift
             ;;
         -h|--help)
@@ -136,6 +143,11 @@ if [ "$SEARCHTEMPLATE_ONLY" = true ] || [ "$FULL_INGESTION_ONLY" = true ] || [ "
         echo "  - Use Instruqt workshop settings"
         CMD="$CMD --instruqt"
     fi
+    
+    if [ "$REINGEST_INSTRUQT_WITH_ENDPOINTS" = true ]; then
+        echo "  - Reingest Instruqt with endpoints"
+        CMD="$CMD --reingest-instruqt-with-endpoints"
+    fi
 elif [ "$USE_SMALL_DATASET" = true ]; then
     # Only --use-small-5k-dataset was specified, run entire script with smaller dataset
     echo "Running complete property data ingestion with smaller dataset..."
@@ -144,6 +156,11 @@ elif [ "$USE_SMALL_DATASET" = true ]; then
     if [ "$INSTRUQT_ONLY" = true ]; then
         echo "  - Use Instruqt workshop settings"
         CMD="$CMD --instruqt"
+    fi
+    
+    if [ "$REINGEST_INSTRUQT_WITH_ENDPOINTS" = true ]; then
+        echo "  - Reingest Instruqt with endpoints"
+        CMD="$CMD --reingest-instruqt-with-endpoints"
     fi
 elif [ "$USE_TINY_DATASET" = true ]; then
     # Only --use-500-dataset was specified, run entire script with tiny dataset
@@ -154,6 +171,10 @@ elif [ "$USE_TINY_DATASET" = true ]; then
         echo "  - Use Instruqt workshop settings"
         CMD="$CMD --instruqt"
     fi
+elif [ "$REINGEST_INSTRUQT_WITH_ENDPOINTS" = true ]; then
+    # Only --reingest-instruqt-with-endpoints was specified
+    echo "Running reingest Instruqt with endpoints operation..."
+    CMD="$CMD --reingest-instruqt-with-endpoints"
 elif [ "$INGEST_RAW_500_DATASET" = true ]; then
     # Only --ingest-raw-500-dataset was specified, run entire script with raw index mapping
     echo "Running complete property data ingestion with raw index mapping and 500-line dataset..."

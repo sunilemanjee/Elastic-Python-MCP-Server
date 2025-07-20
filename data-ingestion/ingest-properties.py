@@ -23,6 +23,8 @@ parser.add_argument('--ingest-raw-500-dataset', action='store_true',
                    help='Use raw index mapping (no ELSER) with 500-line dataset')
 parser.add_argument('--instruqt', action='store_true',
                    help='Use Instruqt workshop settings for Elasticsearch connection')
+parser.add_argument('--reingest-instruqt-with-endpoints', action='store_true',
+                   help='Delete properties index, recreate with Instruqt mapping, and reingest 500-line dataset')
 args = parser.parse_args()
 
 # Create data directory if it doesn't exist
@@ -78,12 +80,16 @@ PROPERTIES_5000_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/prope
 PROPERTIES_500_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties-filtered-500-lines.json"
 SEARCH_TEMPLATE_FILE = os.path.join(os.path.dirname(__file__), "search-template.mustache")
 PROPERTIES_INDEX_MAPPING_FILE = os.path.join(os.path.dirname(__file__), "properties-index-mapping.json")
+PROPERTIES_INDEX_MAPPING_INSTRUQT_FILE = os.path.join(os.path.dirname(__file__), "properties-index-mapping-instruqt.json")
 RAW_INDEX_MAPPING_FILE = os.path.join(os.path.dirname(__file__), "raw-index-mapping.json")
 
 # Determine index name and mapping file based on arguments
 if args.ingest_raw_500_dataset:
     INDEX_NAME = "raw_properties"
     INDEX_MAPPING_FILE = RAW_INDEX_MAPPING_FILE
+elif args.reingest_instruqt_with_endpoints:
+    INDEX_NAME = "properties"
+    INDEX_MAPPING_FILE = PROPERTIES_INDEX_MAPPING_INSTRUQT_FILE
 else:
     INDEX_MAPPING_FILE = PROPERTIES_INDEX_MAPPING_FILE
 
@@ -564,6 +570,22 @@ if __name__ == "__main__":
             create_properties_index()
             download_and_parallel_bulk_load(dataset_url)
             print("✅ Index recreation and data loading complete!")
+        operations_run = True
+        
+    if args.reingest_instruqt_with_endpoints:
+        print("🎯 Running reingest Instruqt with endpoints operation...")
+        # Force use of 500-line dataset for this operation
+        dataset_url = PROPERTIES_500_URL
+        print("📊 Using 500-line dataset for Instruqt reingestion")
+        
+        # Use retry logic for Instruqt reingestion
+        success = retry_ingestion_with_instruqt_logic(dataset_url)
+        if success:
+            print("✅ Instruqt reingestion with endpoints complete!")
+            print(f"📋 Index '{INDEX_NAME}' is ready with Instruqt mapping and 500-line dataset")
+        else:
+            print("❌ Instruqt reingestion failed after all retry attempts")
+            exit(1)
         operations_run = True
         
     # If no specific flags were provided, run everything

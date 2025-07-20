@@ -40,6 +40,7 @@ This script loads property data into Elasticsearch for the intelligent property 
    ./run-ingestion.sh --use-small-5k-dataset # Run everything with smaller dataset
    ./run-ingestion.sh --use-500-dataset   # Run everything with tiny dataset
    ./run-ingestion.sh --instruqt          # Run everything with Instruqt workshop settings
+   ./run-ingestion.sh --reingest-instruqt-with-endpoints # Delete properties index, recreate with Instruqt mapping, and reingest 500-line dataset
    ```
 
 ## Command Line Options
@@ -82,6 +83,14 @@ The ingestion script supports several operation modes:
 - Useful when running in Elastic Instruqt workshop environments
 - Can be combined with other flags for specific operations
 
+### `--reingest-instruqt-with-endpoints`
+- Deletes any existing `properties` index
+- Recreates the index using the `properties-index-mapping-instruqt.json` mapping
+- Uses custom inference endpoints: `my-e5-endpoint` and `my-elser-endpoint` (no default endpoints)
+- Downloads and ingests the 500-line dataset
+- Useful for testing with custom inference endpoints in Instruqt workshop environments
+- Self-contained operation - does not create search templates or raw properties indices
+
 ### Multiple Operations
 You can combine flags to run multiple operations:
 ```bash
@@ -92,6 +101,7 @@ You can combine flags to run multiple operations:
 ./run-ingestion.sh --recreate-index --use-small-5k-dataset
 ./run-ingestion.sh --recreate-index --use-500-dataset
 ./run-ingestion.sh --recreate-index --instruqt
+./run-ingestion.sh --reingest-instruqt-with-endpoints
 ```
 
 ## Elasticsearch Setup
@@ -158,6 +168,7 @@ data-ingestion/
 ├── search-template.mustache      # Search template definition
 ├── raw-index-mapping.json        # Raw index mapping
 ├── properties-index-mapping.json # Processed index mapping
+├── properties-index-mapping-instruqt.json # Instruqt mapping with custom endpoints
 └── README.md                     # This file
 ```
 
@@ -186,6 +197,7 @@ If you prefer to run manually:
    python ingest-properties.py --recreate-index
    python ingest-properties.py --use-small-5k-dataset
    python ingest-properties.py --use-500-dataset
+   python ingest-properties.py --reingest-instruqt-with-endpoints
    ```
 
 4. **Deactivate when done:**
@@ -302,6 +314,7 @@ Use the `--instruqt` flag to enable Instruqt workshop mode:
 ./run-ingestion.sh --searchtemplate --instruqt
 ./run-ingestion.sh --use-small-5k-dataset --instruqt
 ./run-ingestion.sh --use-500-dataset --instruqt
+./run-ingestion.sh --reingest-instruqt-with-endpoints
 ```
 
 The script will automatically detect the `--instruqt` flag and use the appropriate connection parameters. You'll see a message indicating it's using Instruqt workshop settings:
