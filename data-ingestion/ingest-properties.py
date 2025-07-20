@@ -248,7 +248,7 @@ def download_and_parallel_bulk_load(properties_url=None):
         actions=generate_actions(),
         thread_count=4,
         chunk_size=chunk_size,
-        request_timeout=60
+        request_timeout=600
     ):
         if ok:
             success_count += 1
@@ -310,7 +310,7 @@ def bulk_load_from_memory(data_lines):
         actions=generate_actions_from_memory(),
         thread_count=4,
         chunk_size=chunk_size,
-        request_timeout=60
+        request_timeout=600
     ):
         if ok:
             success_count += 1
@@ -446,7 +446,7 @@ def ingest_raw_properties_data(dataset_url):
         actions=generate_actions(),
         thread_count=4,
         chunk_size=chunk_size,
-        request_timeout=60
+        request_timeout=600
     ):
         if ok:
             success_count += 1
