@@ -85,7 +85,6 @@ RAW_INDEX_MAPPING_FILE = os.path.join(os.path.dirname(__file__), "raw-index-mapp
 
 # Determine index name and mapping file based on arguments
 if args.ingest_raw_500_dataset:
-    INDEX_NAME = "raw_properties"
     INDEX_MAPPING_FILE = RAW_INDEX_MAPPING_FILE
 elif args.reingest_instruqt_with_endpoints:
     INDEX_NAME = "properties"
@@ -291,7 +290,7 @@ def bulk_load_from_memory(data_lines):
     error_count = 0
     
     # Use smaller chunk size for Instruqt or raw dataset to avoid 413 errors
-    chunk_size = 10 if (args.instruqt or args.ingest_raw_500_dataset) else 500
+    chunk_size = 10 if (args.instruqt or args.ingest_raw_500_dataset or args.reingest_instruqt_with_endpoints) else 500
     
     def generate_actions_from_memory():
         doc_count = 0
@@ -327,18 +326,27 @@ def bulk_load_from_memory(data_lines):
         print(f"⚠️ Encountered {error_count} errors during indexing")
     
     # Add delay for Instruqt or raw dataset to allow documents to be available for counting
-    if args.instruqt or args.ingest_raw_500_dataset:
-        print("⏳ Waiting 20 seconds for documents to be available for counting...")
-        time.sleep(20)
+    if args.instruqt or args.ingest_raw_500_dataset or args.reingest_instruqt_with_endpoints:
+        print("⏳ Waiting 30 seconds for documents to be available for counting...")
+        time.sleep(30)
     
     # Verify the final document count
     final_count = es.count(index=INDEX_NAME)['count']
     # For Instruqt mode or raw dataset mode, always expect 500 documents since they use the 500-line dataset
-    if args.instruqt or args.ingest_raw_500_dataset:
+    if args.instruqt or args.ingest_raw_500_dataset or args.reingest_instruqt_with_endpoints:
         expected_count = 500
     else:
         expected_count = get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset)
     print(f"📊 Final document count in '{INDEX_NAME}': {final_count}")
+    
+    # If count is close to expected but not quite there, wait a bit more for refresh
+    if args.instruqt or args.ingest_raw_500_dataset or args.reingest_instruqt_with_endpoints:
+        if final_count >= 400 and final_count < expected_count:
+            print(f"📊 Count is close ({final_count}/500), waiting 20 more seconds for refresh...")
+            time.sleep(20)
+            final_count = es.count(index=INDEX_NAME)['count']
+            print(f"📊 Updated document count in '{INDEX_NAME}': {final_count}")
+    
     if final_count == expected_count:
         print(f"✅ Success! Expected {expected_count} documents were indexed.")
         return True
@@ -394,21 +402,19 @@ def retry_ingestion_with_instruqt_logic(dataset_url, max_retries=5):
                 return False
 
 def create_raw_properties_index():
-    """Create and ingest data into raw_properties index"""
-    raw_index_name = "raw_properties"
-    print(f"🏗️ Creating raw properties index '{raw_index_name}' (no ELSER semantic fields)...")
+    """Create and ingest data into raw properties index"""
+    print(f"🏗️ Creating raw properties index '{INDEX_NAME}' (no ELSER semantic fields)...")
     mapping = load_index_mapping(RAW_INDEX_MAPPING_FILE)
 
-    if es.indices.exists(index=raw_index_name):
-        es.indices.delete(index=raw_index_name)
-        print(f"🗑️ Index '{raw_index_name}' deleted.")
+    if es.indices.exists(index=INDEX_NAME):
+        es.indices.delete(index=INDEX_NAME)
+        print(f"🗑️ Index '{INDEX_NAME}' deleted.")
 
-    es.indices.create(index=raw_index_name, body=mapping)
-    print(f"✅ Index '{raw_index_name}' created.")
+    es.indices.create(index=INDEX_NAME, body=mapping)
+    print(f"✅ Index '{INDEX_NAME}' created.")
 
 def ingest_raw_properties_data(dataset_url):
-    """Ingest data into raw_properties index"""
-    raw_index_name = "raw_properties"
+    """Ingest data into raw properties index"""
     print(f"📥 Downloading property data for raw index from {dataset_url}...")
     response = requests.get(dataset_url, stream=True)
     response.raise_for_status()
@@ -423,7 +429,7 @@ def ingest_raw_properties_data(dataset_url):
                 if doc_count % 1000 == 0:
                     print(f"📊 Processed {doc_count} documents...")
                 yield {
-                    "_index": raw_index_name,
+                    "_index": INDEX_NAME,
                     "_source": doc
                 }
         print(f"📊 Total documents to index: {doc_count}")
@@ -451,7 +457,7 @@ def ingest_raw_properties_data(dataset_url):
             if error_count % 100 == 0:
                 print(f"❌ Encountered {error_count} errors...")
 
-    print(f"✅ Successfully indexed {success_count} documents into '{raw_index_name}' using parallel_bulk")
+    print(f"✅ Successfully indexed {success_count} documents into '{INDEX_NAME}' using parallel_bulk")
     if error_count > 0:
         print(f"⚠️ Encountered {error_count} errors during indexing")
     
@@ -460,9 +466,9 @@ def ingest_raw_properties_data(dataset_url):
     time.sleep(20)
     
     # Verify the final document count
-    final_count = es.count(index=raw_index_name)['count']
+    final_count = es.count(index=INDEX_NAME)['count']
     expected_count = 500  # Always expect 500 documents for Instruqt
-    print(f"📊 Final document count in '{raw_index_name}': {final_count}")
+    print(f"📊 Final document count in '{INDEX_NAME}': {final_count}")
     if final_count == expected_count:
         print(f"✅ Success! Expected {expected_count} documents were indexed in raw properties.")
         return True
@@ -513,7 +519,7 @@ if __name__ == "__main__":
                     create_search_template()
                     print("✅ Complete data ingestion pipeline complete!")
                     print(f"📋 Final index '{INDEX_NAME}' is ready for semantic search")
-                    print(f"📋 Final index 'raw_properties' is ready for basic search (no ELSER)")
+                    print(f"📋 Final index '{INDEX_NAME}' is ready for basic search (no ELSER)")
                 else:
                     print("❌ Raw properties index creation failed")
                     exit(1)

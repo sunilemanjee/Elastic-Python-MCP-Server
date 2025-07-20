@@ -33,7 +33,6 @@ show_usage() {
     echo "  $0 --full-ingestion --instruqt        # Run ingestion with Instruqt workshop settings"
     echo "  $0 --reingest-instruqt-with-endpoints # Delete properties index, recreate with Instruqt mapping, and reingest 500-line dataset"
 }
-}
 
 # Parse command line arguments
 SEARCHTEMPLATE_ONLY=false
