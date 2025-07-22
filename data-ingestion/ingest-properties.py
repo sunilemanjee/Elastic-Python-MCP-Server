@@ -77,7 +77,7 @@ RERANK_INFERENCE_ID = os.getenv('RERANK_INFERENCE_ID', ".rerank-v1-elasticsearch
 # Constants
 PROPERTIES_FULL_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties.json"
 PROPERTIES_5000_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties-filtered-5000-lines.json"
-PROPERTIES_500_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties-filtered-500-lines.json"
+PROPERTIES_500_URL = "https://sunmanapp.blob.core.windows.net/publicstuff/properties/properties-filtered-500-lines_cleaned_redacted.json"
 SEARCH_TEMPLATE_FILE = os.path.join(os.path.dirname(__file__), "search-template.mustache")
 PROPERTIES_INDEX_MAPPING_FILE = os.path.join(os.path.dirname(__file__), "properties-index-mapping.json")
 PROPERTIES_INDEX_MAPPING_INSTRUQT_FILE = os.path.join(os.path.dirname(__file__), "properties-index-mapping-instruqt.json")
