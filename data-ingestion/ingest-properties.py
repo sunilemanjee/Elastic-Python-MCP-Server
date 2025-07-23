@@ -4,6 +4,7 @@ import os
 import json
 import argparse
 from elasticsearch import Elasticsearch, helpers
+from elasticsearch.helpers import BulkIndexError
 import requests
 import time
 
@@ -224,7 +225,6 @@ def download_and_parallel_bulk_load(properties_url=None):
 
     def generate_actions():
         doc_count = 0
-        failed_records = []
         for line_num, line in enumerate(response.iter_lines(), 1):
             if line:
                 try:
@@ -239,19 +239,12 @@ def download_and_parallel_bulk_load(properties_url=None):
                     }
                 except json.JSONDecodeError as e:
                     print(f"❌ JSON decode error on line {line_num}: {e}")
-                    failed_records.append({
-                        "line_number": line_num,
-                        "error": f"JSON decode error: {e}",
-                        "data": line.decode("utf-8")[:200] + "..." if len(line) > 200 else line.decode("utf-8")
-                    })
         print(f"📊 Total documents to index: {doc_count}")
-        if failed_records:
-            print(f"⚠️ {len(failed_records)} JSON decode errors encountered during processing")
 
     print("🚀 Starting parallel bulk indexing...")
     success_count = 0
     error_count = 0
-    failed_records = []
+    failed_docs = []  # Track failed documents
     
     # Use smaller chunk size for Instruqt or raw dataset to avoid 413 errors
     chunk_size = 10 if (args.instruqt or args.ingest_raw_500_dataset) else 500
@@ -269,28 +262,30 @@ def download_and_parallel_bulk_load(properties_url=None):
                 print(f"✅ Successfully indexed {success_count} documents...")
         else:
             error_count += 1
-            # Store detailed error information
-            if 'index' in result and 'error' in result['index']:
-                error_info = result['index']['error']
-                failed_records.append({
-                    "line_number": result.get('_line_number', 'unknown'),
-                    "error": error_info.get('reason', 'Unknown error'),
-                    "type": error_info.get('type', 'unknown'),
-                    "data": result.get('_source', {}).get('id', 'unknown_id') if '_source' in result else 'unknown'
-                })
+            # Capture detailed error information
+            error_info = {
+                "error_type": result.get("index", {}).get("error", {}).get("type", "unknown"),
+                "error_reason": result.get("index", {}).get("error", {}).get("reason", "unknown"),
+                "doc_id": result.get("index", {}).get("_id", "unknown"),
+                "line_number": result.get("index", {}).get("_line_number", "unknown")
+            }
+            failed_docs.append(error_info)
+            
             if error_count % 100 == 0:
                 print(f"❌ Encountered {error_count} errors...")
+            elif error_count <= 10:  # Show first 10 errors immediately
+                print(f"❌ Error {error_count}: {error_info['error_type']} - {error_info['error_reason']}")
 
     print(f"✅ Successfully indexed {success_count} documents into '{INDEX_NAME}' using parallel_bulk")
     if error_count > 0:
         print(f"⚠️ Encountered {error_count} errors during indexing")
-        print("📋 Failed records details:")
-        for i, record in enumerate(failed_records[:20], 1):  # Show first 20 failed records
-            print(f"  {i}. Line {record['line_number']}: {record['error']}")
-            if 'data' in record:
-                print(f"     Data: {record['data']}")
-        if len(failed_records) > 20:
-            print(f"  ... and {len(failed_records) - 20} more failed records")
+        
+        # Report failed documents in detail
+        print(f"\n🔍 DETAILED ERROR REPORT:")
+        print(f"Total errors: {error_count}")
+        print(f"Failed documents:")
+        for i, failed_doc in enumerate(failed_docs, 1):
+            print(f"  {i}. Line {failed_doc.get('line_number', 'unknown')}: {failed_doc.get('error_type', 'unknown')} - {failed_doc.get('error_reason', 'unknown')}")
     
     # Add delay for Instruqt or raw dataset to allow documents to be available for counting
     if args.instruqt or args.ingest_raw_500_dataset:
@@ -302,24 +297,14 @@ def download_and_parallel_bulk_load(properties_url=None):
     # For Instruqt mode or raw dataset mode, always expect 500 documents since they use the 500-line dataset
     if args.instruqt or args.ingest_raw_500_dataset:
         expected_count = 500
-        # Accept if more than 450 records are ingested (90% success rate)
-        min_acceptable_count = 450
     else:
         expected_count = get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset)
-        min_acceptable_count = expected_count * 0.9  # 90% success rate
-    
     print(f"📊 Final document count in '{INDEX_NAME}': {final_count}")
     if final_count == expected_count:
         print(f"✅ Success! Expected {expected_count} documents were indexed.")
         return True
-    elif final_count >= min_acceptable_count:
-        print(f"✅ Acceptable success! {final_count}/{expected_count} documents were indexed ({(final_count/expected_count)*100:.1f}% success rate)")
-        if error_count > 0:
-            print(f"⚠️ {error_count} documents failed to index, but {final_count} were successful")
-        return True
     else:
-        print(f"❌ Insufficient success! Only {final_count}/{expected_count} documents were indexed ({(final_count/expected_count)*100:.1f}% success rate)")
-        print(f"   Minimum acceptable: {min_acceptable_count} documents")
+        print(f"⚠️ Expected {expected_count} documents, but {final_count} were indexed.")
         return False
 
 def bulk_load_from_memory(data_lines):
@@ -327,7 +312,7 @@ def bulk_load_from_memory(data_lines):
     print("🚀 Starting parallel bulk indexing from memory...")
     success_count = 0
     error_count = 0
-    failed_records = []
+    failed_docs = []  # Track failed documents
     
     # Use smaller chunk size for Instruqt or raw dataset to avoid 413 errors
     chunk_size = 10 if (args.instruqt or args.ingest_raw_500_dataset or args.reingest_instruqt_with_endpoints) else 500
@@ -347,89 +332,117 @@ def bulk_load_from_memory(data_lines):
                 }
             except json.JSONDecodeError as e:
                 print(f"❌ JSON decode error on line {line_num}: {e}")
-                failed_records.append({
+                failed_docs.append({
                     "line_number": line_num,
                     "error": f"JSON decode error: {e}",
-                    "data": line[:200] + "..." if len(line) > 200 else line
+                    "raw_line": line[:200] + "..." if len(line) > 200 else line
                 })
         print(f"📊 Total documents to index: {doc_count}")
     
-    for ok, result in helpers.parallel_bulk(
-        es,
-        actions=generate_actions_from_memory(),
-        thread_count=4,
-        chunk_size=chunk_size,
-        request_timeout=600
-    ):
-        if ok:
-            success_count += 1
-            if success_count % 1000 == 0:
-                print(f"✅ Successfully indexed {success_count} documents...")
-        else:
-            error_count += 1
-            # Store detailed error information
-            if 'index' in result and 'error' in result['index']:
-                error_info = result['index']['error']
-                failed_records.append({
-                    "line_number": result.get('_line_number', 'unknown'),
-                    "error": error_info.get('reason', 'Unknown error'),
-                    "type": error_info.get('type', 'unknown'),
-                    "data": result.get('_source', {}).get('id', 'unknown_id') if '_source' in result else 'unknown'
-                })
-            if error_count % 100 == 0:
-                print(f"❌ Encountered {error_count} errors...")
+    try:
+        for ok, result in helpers.parallel_bulk(
+            es,
+            actions=generate_actions_from_memory(),
+            thread_count=4,
+            chunk_size=chunk_size,
+            request_timeout=600
+        ):
+            if ok:
+                success_count += 1
+                if success_count % 1000 == 0:
+                    print(f"✅ Successfully indexed {success_count} documents...")
+            else:
+                error_count += 1
+                # Capture detailed error information
+                error_info = {
+                    "error_type": result.get("index", {}).get("error", {}).get("type", "unknown"),
+                    "error_reason": result.get("index", {}).get("error", {}).get("reason", "unknown"),
+                    "doc_id": result.get("index", {}).get("_id", "unknown"),
+                    "line_number": result.get("index", {}).get("_line_number", "unknown")
+                }
+                failed_docs.append(error_info)
+                
+                if error_count % 100 == 0:
+                    print(f"❌ Encountered {error_count} errors...")
+                elif error_count <= 10:  # Show first 10 errors immediately
+                    print(f"❌ Error {error_count}: {error_info['error_type']} - {error_info['error_reason']}")
 
-    print(f"✅ Successfully indexed {success_count} documents into '{INDEX_NAME}' using parallel_bulk")
-    if error_count > 0:
-        print(f"⚠️ Encountered {error_count} errors during indexing")
-        print("📋 Failed records details:")
-        for i, record in enumerate(failed_records[:20], 1):  # Show first 20 failed records
-            print(f"  {i}. Line {record['line_number']}: {record['error']}")
-            if 'data' in record:
-                print(f"     Data: {record['data']}")
-        if len(failed_records) > 20:
-            print(f"  ... and {len(failed_records) - 20} more failed records")
-    
-    # Add delay for Instruqt or raw dataset to allow documents to be available for counting
-    if args.instruqt or args.ingest_raw_500_dataset or args.reingest_instruqt_with_endpoints:
-        print("⏳ Waiting 30 seconds for documents to be available for counting...")
-        time.sleep(30)
-    
-    # Verify the final document count
-    final_count = es.count(index=INDEX_NAME)['count']
-    # For Instruqt mode or raw dataset mode, always expect 500 documents since they use the 500-line dataset
-    if args.instruqt or args.ingest_raw_500_dataset or args.reingest_instruqt_with_endpoints:
-        expected_count = 500
-        # Accept if more than 450 records are ingested (90% success rate)
-        min_acceptable_count = 450
-    else:
-        expected_count = get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset)
-        min_acceptable_count = expected_count * 0.9  # 90% success rate
-    
-    print(f"📊 Final document count in '{INDEX_NAME}': {final_count}")
-    
-    # If count is close to expected but not quite there, wait a bit more for refresh
-    if args.instruqt or args.ingest_raw_500_dataset or args.reingest_instruqt_with_endpoints:
-        if final_count >= 400 and final_count < expected_count:
-            print(f"📊 Count is close ({final_count}/500), waiting 20 more seconds for refresh...")
-            time.sleep(20)
-            final_count = es.count(index=INDEX_NAME)['count']
-            print(f"📊 Updated document count in '{INDEX_NAME}': {final_count}")
-    
-    if final_count == expected_count:
-        print(f"✅ Success! Expected {expected_count} documents were indexed.")
-        return True
-    elif final_count >= min_acceptable_count:
-        print(f"✅ Acceptable success! {final_count}/{expected_count} documents were indexed ({(final_count/expected_count)*100:.1f}% success rate)")
+        print(f"✅ Successfully indexed {success_count} documents into '{INDEX_NAME}' using parallel_bulk")
         if error_count > 0:
-            print(f"⚠️ {error_count} documents failed to index, but {final_count} were successful")
-        return True
-    else:
-        print(f"❌ Insufficient success! Only {final_count}/{expected_count} documents were indexed ({(final_count/expected_count)*100:.1f}% success rate)")
-        print(f"   Minimum acceptable: {min_acceptable_count} documents")
-        return False
+            print(f"⚠️ Encountered {error_count} errors during indexing")
+            
+            # Report failed documents in detail
+            print(f"\n🔍 DETAILED ERROR REPORT:")
+            print(f"Total errors: {error_count}")
+            print(f"Failed documents:")
+            for i, failed_doc in enumerate(failed_docs, 1):
+                print(f"  {i}. Line {failed_doc.get('line_number', 'unknown')}: {failed_doc.get('error_type', 'unknown')} - {failed_doc.get('error_reason', 'unknown')}")
+                if 'raw_line' in failed_doc:
+                    print(f"     Raw data: {failed_doc['raw_line']}")
+            
+            # If using reingest-instruqt-with-endpoints, save failed docs to file
+            if args.reingest_instruqt_with_endpoints:
+                error_file = "failed_documents.json"
+                with open(error_file, 'w') as f:
+                    json.dump(failed_docs, f, indent=2)
+                print(f"\n💾 Failed document details saved to: {error_file}")
+        
+        # Add delay for Instruqt or raw dataset to allow documents to be available for counting
+        if args.instruqt or args.ingest_raw_500_dataset or args.reingest_instruqt_with_endpoints:
+            print("⏳ Waiting 30 seconds for documents to be available for counting...")
+            time.sleep(30)
+        
+        # Verify the final document count
+        final_count = es.count(index=INDEX_NAME)['count']
+        # For Instruqt mode or raw dataset mode, always expect 500 documents since they use the 500-line dataset
+        if args.instruqt or args.ingest_raw_500_dataset or args.reingest_instruqt_with_endpoints:
+            expected_count = 500
+        else:
+            expected_count = get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset)
+        print(f"📊 Final document count in '{INDEX_NAME}': {final_count}")
+        
+        # If count is close to expected but not quite there, wait a bit more for refresh
+        if args.instruqt or args.ingest_raw_500_dataset or args.reingest_instruqt_with_endpoints:
+            if final_count >= 400 and final_count < expected_count:
+                print(f"📊 Count is close ({final_count}/500), waiting 20 more seconds for refresh...")
+                time.sleep(20)
+                final_count = es.count(index=INDEX_NAME)['count']
+                print(f"📊 Updated document count in '{INDEX_NAME}': {final_count}")
+        
+        if final_count == expected_count:
+            print(f"✅ Success! Expected {expected_count} documents were indexed.")
+            return True, failed_docs
+        else:
+            print(f"⚠️ Expected {expected_count} documents, but {final_count} were indexed.")
+            return False, failed_docs
+            
+    except BulkIndexError as e:
+        print(f"❌ BulkIndexError: {e}")
+        print(f"📊 Total errors in bulk operation: {len(e.errors)}")
+        
+        # Extract detailed error information from the BulkIndexError
+        for i, error in enumerate(e.errors, 1):
+            if 'index' in error:
+                index_error = error['index']
+                error_info = {
+                    "error_type": index_error.get("error", {}).get("type", "unknown"),
+                    "error_reason": index_error.get("error", {}).get("reason", "unknown"),
+                    "doc_id": index_error.get("_id", "unknown"),
+                    "line_number": "unknown"  # We can't get line number from BulkIndexError
+                }
+                failed_docs.append(error_info)
+                print(f"  {i}. Document {error_info['doc_id']}: {error_info['error_type']} - {error_info['error_reason']}")
+        
+        # Save failed documents to file
+        if args.reingest_instruqt_with_endpoints:
+            error_file = "failed_documents.json"
+            with open(error_file, 'w') as f:
+                json.dump(failed_docs, f, indent=2)
+            print(f"\n💾 Failed document details saved to: {error_file}")
+        
+        return False, failed_docs
 
-def retry_ingestion_with_instruqt_logic(dataset_url, max_retries=5):
+def retry_ingestion_with_instruqt_logic(dataset_url, max_retries=0):
     """Retry ingestion logic specifically for Instruqt workshop settings or raw dataset ingestion"""
     print(f"📥 Downloading property data from {dataset_url}...")
     response = requests.get(dataset_url, stream=True)
@@ -444,36 +457,79 @@ def retry_ingestion_with_instruqt_logic(dataset_url, max_retries=5):
     
     print(f"📊 Downloaded {len(data_lines)} documents for retry attempts")
     
-    for attempt in range(1, max_retries + 1):
+    # Track all errors across all attempts
+    all_failed_docs = []
+    
+    # Calculate number of attempts (1 for max_retries=0, max_retries+1 for max_retries>0)
+    num_attempts = 1 if max_retries == 0 else max_retries + 1
+    
+    for attempt in range(1, num_attempts + 1):
         if args.instruqt:
-            print(f"🔄 Attempt {attempt}/{max_retries} for Instruqt ingestion...")
+            print(f"🔄 Attempt {attempt}/{num_attempts} for Instruqt ingestion...")
         else:
-            print(f"🔄 Attempt {attempt}/{max_retries} for raw dataset ingestion...")
+            print(f"🔄 Attempt {attempt}/{num_attempts} for raw dataset ingestion...")
         
         try:
+            print("🏗️ Creating properties index...")
             # Create index and ingest data from memory
             create_properties_index()
-            success = bulk_load_from_memory(data_lines)
+            print("🚀 Starting bulk ingestion...")
+            success, failed_docs = bulk_load_from_memory(data_lines)
+            
+            # Collect failed documents from this attempt
+            if failed_docs:
+                all_failed_docs.extend(failed_docs)
+                print(f"📊 Attempt {attempt} had {len(failed_docs)} failed documents")
             
             if success:
                 print(f"✅ Success on attempt {attempt}!")
+                
+                # Even if successful, save any errors that occurred during retries
+                if all_failed_docs and args.reingest_instruqt_with_endpoints:
+                    error_file = "failed_documents.json"
+                    with open(error_file, 'w') as f:
+                        json.dump(all_failed_docs, f, indent=2)
+                    print(f"💾 All failed document details from retry attempts saved to: {error_file}")
+                    print(f"📊 Total errors across all attempts: {len(all_failed_docs)}")
+                
                 return True
             else:
                 print(f"❌ Attempt {attempt} failed - incorrect document count")
-                if attempt < max_retries:
+                if attempt < num_attempts:
                     print("⏳ Waiting 30 seconds before retry...")
                     time.sleep(30)
                 else:
-                    print(f"❌ All {max_retries} attempts failed")
+                    print(f"❌ All {num_attempts} attempts failed")
+                    
+                    # Save all failed documents from all attempts
+                    if all_failed_docs and args.reingest_instruqt_with_endpoints:
+                        error_file = "failed_documents.json"
+                        with open(error_file, 'w') as f:
+                            json.dump(all_failed_docs, f, indent=2)
+                        print(f"💾 All failed document details from all attempts saved to: {error_file}")
+                        print(f"📊 Total errors across all attempts: {len(all_failed_docs)}")
+                    
                     return False
                     
         except Exception as e:
             print(f"❌ Attempt {attempt} failed with error: {e}")
-            if attempt < max_retries:
+            import traceback
+            print(f"🔍 Full error details:")
+            traceback.print_exc()
+            
+            if attempt < num_attempts:
                 print("⏳ Waiting 30 seconds before retry...")
                 time.sleep(30)
             else:
-                print(f"❌ All {max_retries} attempts failed")
+                print(f"❌ All {num_attempts} attempts failed")
+                
+                # Save any failed documents we collected
+                if all_failed_docs and args.reingest_instruqt_with_endpoints:
+                    error_file = "failed_documents.json"
+                    with open(error_file, 'w') as f:
+                        json.dump(all_failed_docs, f, indent=2)
+                    print(f"💾 Failed document details saved to: {error_file}")
+                
                 return False
 
 def create_raw_properties_index():
@@ -497,7 +553,6 @@ def ingest_raw_properties_data(dataset_url):
 
     def generate_actions():
         doc_count = 0
-        failed_records = []
         for line_num, line in enumerate(response.iter_lines(), 1):
             if line:
                 try:
@@ -512,19 +567,12 @@ def ingest_raw_properties_data(dataset_url):
                     }
                 except json.JSONDecodeError as e:
                     print(f"❌ JSON decode error on line {line_num}: {e}")
-                    failed_records.append({
-                        "line_number": line_num,
-                        "error": f"JSON decode error: {e}",
-                        "data": line.decode("utf-8")[:200] + "..." if len(line) > 200 else line.decode("utf-8")
-                    })
         print(f"📊 Total documents to index: {doc_count}")
-        if failed_records:
-            print(f"⚠️ {len(failed_records)} JSON decode errors encountered during processing")
 
     print("🚀 Starting parallel bulk indexing for raw properties...")
     success_count = 0
     error_count = 0
-    failed_records = []
+    failed_docs = []  # Track failed documents
     
     # Use smaller chunk size for Instruqt to avoid 413 errors
     chunk_size = 10
@@ -542,28 +590,30 @@ def ingest_raw_properties_data(dataset_url):
                 print(f"✅ Successfully indexed {success_count} documents...")
         else:
             error_count += 1
-            # Store detailed error information
-            if 'index' in result and 'error' in result['index']:
-                error_info = result['index']['error']
-                failed_records.append({
-                    "line_number": result.get('_line_number', 'unknown'),
-                    "error": error_info.get('reason', 'Unknown error'),
-                    "type": error_info.get('type', 'unknown'),
-                    "data": result.get('_source', {}).get('id', 'unknown_id') if '_source' in result else 'unknown'
-                })
+            # Capture detailed error information
+            error_info = {
+                "error_type": result.get("index", {}).get("error", {}).get("type", "unknown"),
+                "error_reason": result.get("index", {}).get("error", {}).get("reason", "unknown"),
+                "doc_id": result.get("index", {}).get("_id", "unknown"),
+                "line_number": result.get("index", {}).get("_line_number", "unknown")
+            }
+            failed_docs.append(error_info)
+            
             if error_count % 100 == 0:
                 print(f"❌ Encountered {error_count} errors...")
+            elif error_count <= 10:  # Show first 10 errors immediately
+                print(f"❌ Error {error_count}: {error_info['error_type']} - {error_info['error_reason']}")
 
     print(f"✅ Successfully indexed {success_count} documents into '{INDEX_NAME}' using parallel_bulk")
     if error_count > 0:
         print(f"⚠️ Encountered {error_count} errors during indexing")
-        print("📋 Failed records details:")
-        for i, record in enumerate(failed_records[:20], 1):  # Show first 20 failed records
-            print(f"  {i}. Line {record['line_number']}: {record['error']}")
-            if 'data' in record:
-                print(f"     Data: {record['data']}")
-        if len(failed_records) > 20:
-            print(f"  ... and {len(failed_records) - 20} more failed records")
+        
+        # Report failed documents in detail
+        print(f"\n🔍 DETAILED ERROR REPORT:")
+        print(f"Total errors: {error_count}")
+        print(f"Failed documents:")
+        for i, failed_doc in enumerate(failed_docs, 1):
+            print(f"  {i}. Line {failed_doc.get('line_number', 'unknown')}: {failed_doc.get('error_type', 'unknown')} - {failed_doc.get('error_reason', 'unknown')}")
     
     # Add delay for Instruqt to allow documents to be available for counting
     print("⏳ Waiting 20 seconds for documents to be available for counting...")
@@ -572,19 +622,12 @@ def ingest_raw_properties_data(dataset_url):
     # Verify the final document count
     final_count = es.count(index=INDEX_NAME)['count']
     expected_count = 500  # Always expect 500 documents for Instruqt
-    min_acceptable_count = 450  # Accept if more than 450 records are ingested (90% success rate)
     print(f"📊 Final document count in '{INDEX_NAME}': {final_count}")
     if final_count == expected_count:
         print(f"✅ Success! Expected {expected_count} documents were indexed in raw properties.")
         return True
-    elif final_count >= min_acceptable_count:
-        print(f"✅ Acceptable success! {final_count}/{expected_count} documents were indexed in raw properties ({(final_count/expected_count)*100:.1f}% success rate)")
-        if error_count > 0:
-            print(f"⚠️ {error_count} documents failed to index, but {final_count} were successful")
-        return True
     else:
-        print(f"❌ Insufficient success! Only {final_count}/{expected_count} documents were indexed in raw properties ({(final_count/expected_count)*100:.1f}% success rate)")
-        print(f"   Minimum acceptable: {min_acceptable_count} documents")
+        print(f"⚠️ Expected {expected_count} documents, but {final_count} were indexed in raw properties.")
         return False
 
 # Main execution logic based on command line arguments
