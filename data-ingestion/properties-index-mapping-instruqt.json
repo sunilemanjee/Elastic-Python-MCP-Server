@@ -20,14 +20,14 @@
       },
       "body_content_elser": {
         "type": "semantic_text",
-        "inference_id": "my-elser-endpoint",
+        "inference_id": ".elser-2-elastic",
         "model_settings": {
           "task_type": "sparse_embedding"
         }
       },
       "body_content_e5": {
         "type": "semantic_text",
-        "inference_id": "my-e5-endpoint",
+        "inference_id": ".multilingual-e5-small-elasticsearch",
         "model_settings": {
           "task_type": "text_embedding",
           "dimensions": 384,
