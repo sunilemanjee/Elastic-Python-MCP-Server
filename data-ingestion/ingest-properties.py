@@ -24,8 +24,8 @@ parser.add_argument('--ingest-raw-500-dataset', action='store_true',
                    help='Use raw index mapping (no ELSER) with 500-line dataset')
 parser.add_argument('--instruqt', action='store_true',
                    help='Use Instruqt workshop settings for Elasticsearch connection')
-parser.add_argument('--reingest-instruqt-with-endpoints', action='store_true',
-                   help='Delete properties index, recreate with Instruqt mapping, and reingest 500-line dataset')
+parser.add_argument('--instruqt-reindex-with-endpoints', action='store_true',
+                   help='Reindex properties to properties-original, delete properties, recreate with Instruqt mapping, and reindex 10 documents')
 args = parser.parse_args()
 
 # Create data directory if it doesn't exist
@@ -87,7 +87,7 @@ RAW_INDEX_MAPPING_FILE = os.path.join(os.path.dirname(__file__), "raw-index-mapp
 # Determine index name and mapping file based on arguments
 if args.ingest_raw_500_dataset:
     INDEX_MAPPING_FILE = RAW_INDEX_MAPPING_FILE
-elif args.reingest_instruqt_with_endpoints:
+elif args.instruqt_reindex_with_endpoints:
     INDEX_NAME = "properties"
     INDEX_MAPPING_FILE = PROPERTIES_INDEX_MAPPING_INSTRUQT_FILE
 else:
@@ -315,7 +315,7 @@ def bulk_load_from_memory(data_lines):
     failed_docs = []  # Track failed documents
     
     # Use smaller chunk size for Instruqt or raw dataset to avoid 413 errors
-    chunk_size = 10 if (args.instruqt or args.ingest_raw_500_dataset or args.reingest_instruqt_with_endpoints) else 500
+    chunk_size = 10 if (args.instruqt or args.ingest_raw_500_dataset or args.instruqt_reindex_with_endpoints) else 500
     
     def generate_actions_from_memory():
         doc_count = 0
@@ -380,29 +380,29 @@ def bulk_load_from_memory(data_lines):
                 if 'raw_line' in failed_doc:
                     print(f"     Raw data: {failed_doc['raw_line']}")
             
-            # If using reingest-instruqt-with-endpoints, save failed docs to file
-            if args.reingest_instruqt_with_endpoints:
+            # If using instruqt-reindex-with-endpoints, save failed docs to file
+            if args.instruqt_reindex_with_endpoints:
                 error_file = "failed_documents.json"
                 with open(error_file, 'w') as f:
                     json.dump(failed_docs, f, indent=2)
                 print(f"\n💾 Failed document details saved to: {error_file}")
         
         # Add delay for Instruqt or raw dataset to allow documents to be available for counting
-        if args.instruqt or args.ingest_raw_500_dataset or args.reingest_instruqt_with_endpoints:
+        if args.instruqt or args.ingest_raw_500_dataset or args.instruqt_reindex_with_endpoints:
             print("⏳ Waiting 30 seconds for documents to be available for counting...")
             time.sleep(30)
         
         # Verify the final document count
         final_count = es.count(index=INDEX_NAME)['count']
         # For Instruqt mode or raw dataset mode, always expect 500 documents since they use the 500-line dataset
-        if args.instruqt or args.ingest_raw_500_dataset or args.reingest_instruqt_with_endpoints:
+        if args.instruqt or args.ingest_raw_500_dataset or args.instruqt_reindex_with_endpoints:
             expected_count = 500
         else:
             expected_count = get_expected_document_count(args.use_small_5k_dataset, args.use_500_dataset)
         print(f"📊 Final document count in '{INDEX_NAME}': {final_count}")
         
         # If count is close to expected but not quite there, wait a bit more for refresh
-        if args.instruqt or args.ingest_raw_500_dataset or args.reingest_instruqt_with_endpoints:
+        if args.instruqt or args.ingest_raw_500_dataset or args.instruqt_reindex_with_endpoints:
             if final_count >= 400 and final_count < expected_count:
                 print(f"📊 Count is close ({final_count}/500), waiting 20 more seconds for refresh...")
                 time.sleep(20)
@@ -434,7 +434,7 @@ def bulk_load_from_memory(data_lines):
                 print(f"  {i}. Document {error_info['doc_id']}: {error_info['error_type']} - {error_info['error_reason']}")
         
         # Save failed documents to file
-        if args.reingest_instruqt_with_endpoints:
+        if args.instruqt_reindex_with_endpoints:
             error_file = "failed_documents.json"
             with open(error_file, 'w') as f:
                 json.dump(failed_docs, f, indent=2)
@@ -485,7 +485,7 @@ def retry_ingestion_with_instruqt_logic(dataset_url, max_retries=0):
                 print(f"✅ Success on attempt {attempt}!")
                 
                 # Even if successful, save any errors that occurred during retries
-                if all_failed_docs and args.reingest_instruqt_with_endpoints:
+                if all_failed_docs and args.instruqt_reindex_with_endpoints:
                     error_file = "failed_documents.json"
                     with open(error_file, 'w') as f:
                         json.dump(all_failed_docs, f, indent=2)
@@ -502,7 +502,7 @@ def retry_ingestion_with_instruqt_logic(dataset_url, max_retries=0):
                     print(f"❌ All {num_attempts} attempts failed")
                     
                     # Save all failed documents from all attempts
-                    if all_failed_docs and args.reingest_instruqt_with_endpoints:
+                    if all_failed_docs and args.instruqt_reindex_with_endpoints:
                         error_file = "failed_documents.json"
                         with open(error_file, 'w') as f:
                             json.dump(all_failed_docs, f, indent=2)
@@ -524,7 +524,7 @@ def retry_ingestion_with_instruqt_logic(dataset_url, max_retries=0):
                 print(f"❌ All {num_attempts} attempts failed")
                 
                 # Save any failed documents we collected
-                if all_failed_docs and args.reingest_instruqt_with_endpoints:
+                if all_failed_docs and args.instruqt_reindex_with_endpoints:
                     error_file = "failed_documents.json"
                     with open(error_file, 'w') as f:
                         json.dump(all_failed_docs, f, indent=2)
@@ -630,6 +630,114 @@ def ingest_raw_properties_data(dataset_url):
         print(f"⚠️ Expected {expected_count} documents, but {final_count} were indexed in raw properties.")
         return False
 
+def instruqt_reindex_with_endpoints():
+    """Perform reindexing operation for Instruqt with endpoints"""
+    print("🎯 Running Instruqt reindex with endpoints operation...")
+    
+    # Step 1: Reindex properties to properties-original
+    print("📋 Step 1: Reindexing properties to properties-original...")
+    try:
+        reindex_response = es.reindex(
+            body={
+                "source": {
+                    "index": "properties"
+                },
+                "dest": {
+                    "index": "properties-original"
+                }
+            },
+            wait_for_completion=False
+        )
+        task_id = reindex_response['task']
+        print(f"✅ Reindex task started with ID: {task_id}")
+        
+        # Wait for the reindex task to complete
+        print("⏳ Waiting for reindex task to complete...")
+        while True:
+            task_status = es.tasks.get(task_id=task_id)
+            if task_status['completed']:
+                print("✅ Reindex to properties-original completed")
+                break
+            time.sleep(5)
+            
+    except Exception as e:
+        print(f"❌ Failed to reindex properties to properties-original: {e}")
+        return False
+    
+    # Step 2: Delete properties index
+    print("🗑️ Step 2: Deleting properties index...")
+    try:
+        if es.indices.exists(index="properties"):
+            es.indices.delete(index="properties")
+            print("✅ Properties index deleted")
+        else:
+            print("⚠️ Properties index does not exist, skipping deletion")
+    except Exception as e:
+        print(f"❌ Failed to delete properties index: {e}")
+        return False
+    
+    # Step 3: Create properties index with Instruqt mapping
+    print("📋 Step 3: Creating properties index with Instruqt mapping...")
+    try:
+        mapping = load_index_mapping(PROPERTIES_INDEX_MAPPING_INSTRUQT_FILE)
+        es.indices.create(index="properties", body=mapping)
+        print("✅ Properties index created with Instruqt mapping")
+    except Exception as e:
+        print(f"❌ Failed to create properties index: {e}")
+        return False
+    
+    # Step 4: Delete properties index again
+    print("🗑️ Step 4: Deleting properties index again...")
+    try:
+        if es.indices.exists(index="properties"):
+            es.indices.delete(index="properties")
+            print("✅ Properties index deleted again")
+        else:
+            print("⚠️ Properties index does not exist, skipping deletion")
+    except Exception as e:
+        print(f"❌ Failed to delete properties index: {e}")
+        return False
+    
+    # Step 5: Reindex 10 documents from properties-original to properties
+    print("📋 Step 5: Reindexing 10 documents from properties-original to properties...")
+    try:
+        # First recreate the properties index
+        mapping = load_index_mapping(PROPERTIES_INDEX_MAPPING_INSTRUQT_FILE)
+        es.indices.create(index="properties", body=mapping)
+        print("✅ Properties index recreated with Instruqt mapping")
+        
+        # Now reindex 10 documents
+        reindex_response = es.reindex(
+            body={
+                "source": {
+                    "index": "properties-original",
+                    "size": 10
+                },
+                "dest": {
+                    "index": "properties"
+                }
+            },
+            wait_for_completion=False
+        )
+        task_id = reindex_response['task']
+        print(f"✅ Reindex task started with ID: {task_id}")
+        
+        # Wait for the reindex task to complete
+        print("⏳ Waiting for reindex task to complete...")
+        while True:
+            task_status = es.tasks.get(task_id=task_id)
+            if task_status['completed']:
+                print("✅ Reindex of 10 documents completed")
+                break
+            time.sleep(5)
+            
+    except Exception as e:
+        print(f"❌ Failed to reindex documents: {e}")
+        return False
+    
+    print("🎉 Instruqt reindex with endpoints operation completed successfully!")
+    return True
+
 # Main execution logic based on command line arguments
 if __name__ == "__main__":
     # Determine which dataset URL to use
@@ -732,19 +840,16 @@ if __name__ == "__main__":
             print("✅ Index recreation and data loading complete!")
         operations_run = True
         
-    if args.reingest_instruqt_with_endpoints:
-        print("🎯 Running reingest Instruqt with endpoints operation...")
-        # Force use of 500-line dataset for this operation
-        dataset_url = PROPERTIES_500_URL
-        print("📊 Using 500-line dataset for Instruqt reingestion")
+    if args.instruqt_reindex_with_endpoints:
+        print("🎯 Running Instruqt reindex with endpoints operation...")
         
-        # Use retry logic for Instruqt reingestion
-        success = retry_ingestion_with_instruqt_logic(dataset_url)
+        # Call the new reindexing function
+        success = instruqt_reindex_with_endpoints()
         if success:
-            print("✅ Instruqt reingestion with endpoints complete!")
-            print(f"📋 Index '{INDEX_NAME}' is ready with Instruqt mapping and 500-line dataset")
+            print("✅ Instruqt reindex with endpoints complete!")
+            print(f"📋 Index 'properties' is ready with Instruqt mapping and 10 reindexed documents")
         else:
-            print("❌ Instruqt reingestion failed after all retry attempts")
+            print("❌ Instruqt reindex with endpoints failed")
             exit(1)
         operations_run = True
         

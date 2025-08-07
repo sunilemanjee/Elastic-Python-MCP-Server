@@ -1,0 +1,32 @@
+[
+  {
+    "error_type": "inference_exception",
+    "error_reason": "Exception when running inference id [.elser-2-elastic] on field [body_content_elser]",
+    "doc_id": "bsM4fJgBx8TVHZwwUjZk",
+    "line_number": "unknown"
+  },
+  {
+    "error_type": "inference_exception",
+    "error_reason": "Exception when running inference id [.elser-2-elastic] on field [body_content_elser]",
+    "doc_id": "b8M4fJgBx8TVHZwwUjZk",
+    "line_number": "unknown"
+  },
+  {
+    "error_type": "inference_exception",
+    "error_reason": "Exception when running inference id [.elser-2-elastic] on field [body_content_elser]",
+    "doc_id": "csM4fJgBx8TVHZwwUjZk",
+    "line_number": "unknown"
+  },
+  {
+    "error_type": "inference_exception",
+    "error_reason": "Exception when running inference id [.elser-2-elastic] on field [body_content_elser]",
+    "doc_id": "dMM4fJgBx8TVHZwwUjZk",
+    "line_number": "unknown"
+  },
+  {
+    "error_type": "inference_exception",
+    "error_reason": "Exception when running inference id [.elser-2-elastic] on field [body_content_elser]",
+    "doc_id": "dcM4fJgBx8TVHZwwUjZk",
+    "line_number": "unknown"
+  }
+]
