@@ -653,11 +653,17 @@ def instruqt_reindex_with_endpoints():
         
         # Wait for the reindex task to complete
         print("⏳ Waiting for reindex task to complete...")
+        start_time = time.time()
+        poll_count = 0
         while True:
             task_status = es.tasks.get(task_id=task_id)
             if task_status['completed']:
-                print("✅ Reindex to properties-original completed")
+                elapsed_time = time.time() - start_time
+                print(f"✅ Reindex to properties-original completed (took {elapsed_time:.1f} seconds)")
                 break
+            poll_count += 1
+            elapsed_time = time.time() - start_time
+            print(f"⏳ Still waiting... (poll #{poll_count}, {elapsed_time:.1f}s elapsed)")
             time.sleep(5)
             
     except Exception as e:
@@ -724,11 +730,17 @@ def instruqt_reindex_with_endpoints():
         
         # Wait for the reindex task to complete
         print("⏳ Waiting for reindex task to complete...")
+        start_time = time.time()
+        poll_count = 0
         while True:
             task_status = es.tasks.get(task_id=task_id)
             if task_status['completed']:
-                print("✅ Reindex of 10 documents completed")
+                elapsed_time = time.time() - start_time
+                print(f"✅ Reindex of 10 documents completed (took {elapsed_time:.1f} seconds)")
                 break
+            poll_count += 1
+            elapsed_time = time.time() - start_time
+            print(f"⏳ Still waiting... (poll #{poll_count}, {elapsed_time:.1f}s elapsed)")
             time.sleep(5)
             
     except Exception as e:
