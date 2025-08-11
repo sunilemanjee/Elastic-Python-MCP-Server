@@ -704,8 +704,8 @@ def instruqt_reindex_with_endpoints():
         print(f"❌ Failed to delete properties index: {e}")
         return False
     
-    # Step 5: Reindex 10 documents from original-properties to properties
-    print("📋 Step 5: Reindexing 10 documents from original-properties to properties...")
+    # Step 5: Reindex documents from original-properties to properties
+    print("📋 Step 5: Reindexing documents from original-properties to properties...")
     try:
         # First recreate the properties index
         mapping = load_index_mapping(PROPERTIES_INDEX_MAPPING_INSTRUQT_FILE)
