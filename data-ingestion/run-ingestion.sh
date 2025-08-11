@@ -12,7 +12,7 @@ show_usage() {
     echo "  --use-500-dataset   Use the tiny 500-line dataset instead of the full dataset"
     echo "  --ingest-raw-500-dataset Use raw index mapping (no ELSER) with 500-line dataset"
     echo "  --instruqt          Use Instruqt workshop settings for Elasticsearch connection"
-    echo "  --instruqt-reindex-with-endpoints Reindex properties to properties-original, delete properties, recreate with Instruqt mapping, and reindex 10 documents"
+    echo "  --instruqt-reindex-with-endpoints Reindex properties to original-properties, delete properties, recreate with Instruqt mapping, and reindex 10 documents"
     echo "  -h, --help          Show this help message"
     echo ""
     echo "Multiple flags can be combined to run specific operations."
@@ -31,7 +31,7 @@ show_usage() {
     echo "  $0 --full-ingestion --use-small-5k-dataset # Run ingestion with smaller dataset"
     echo "  $0 --full-ingestion --use-500-dataset  # Run ingestion with tiny dataset"
     echo "  $0 --full-ingestion --instruqt        # Run ingestion with Instruqt workshop settings"
-    echo "  $0 --instruqt-reindex-with-endpoints # Reindex properties to properties-original, delete properties, recreate with Instruqt mapping, and reindex 10 documents"
+    echo "  $0 --instruqt-reindex-with-endpoints # Reindex properties to original-properties, delete properties, recreate with Instruqt mapping, and reindex 10 documents"
 }
 
 # Parse command line arguments

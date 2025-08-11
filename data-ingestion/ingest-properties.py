@@ -25,7 +25,7 @@ parser.add_argument('--ingest-raw-500-dataset', action='store_true',
 parser.add_argument('--instruqt', action='store_true',
                    help='Use Instruqt workshop settings for Elasticsearch connection')
 parser.add_argument('--instruqt-reindex-with-endpoints', action='store_true',
-                   help='Reindex properties to properties-original, delete properties, recreate with Instruqt mapping, and reindex 10 documents')
+                   help='Reindex properties to original-properties, delete properties, recreate with Instruqt mapping, and reindex 10 documents')
 args = parser.parse_args()
 
 # Create data directory if it doesn't exist
@@ -634,8 +634,8 @@ def instruqt_reindex_with_endpoints():
     """Perform reindexing operation for Instruqt with endpoints"""
     print("🎯 Running Instruqt reindex with endpoints operation...")
     
-    # Step 1: Reindex properties to properties-original
-    print("📋 Step 1: Reindexing properties to properties-original...")
+    # Step 1: Reindex properties to original-properties
+    print("📋 Step 1: Reindexing properties to original-properties...")
     try:
         reindex_response = es.reindex(
             body={
@@ -643,7 +643,7 @@ def instruqt_reindex_with_endpoints():
                     "index": "properties"
                 },
                 "dest": {
-                    "index": "properties-original"
+                    "index": "original-properties"
                 }
             },
             wait_for_completion=False
@@ -659,7 +659,7 @@ def instruqt_reindex_with_endpoints():
             task_status = es.tasks.get(task_id=task_id)
             if task_status['completed']:
                 elapsed_time = time.time() - start_time
-                print(f"✅ Reindex to properties-original completed (took {elapsed_time:.1f} seconds)")
+                print(f"✅ Reindex to original-properties completed (took {elapsed_time:.1f} seconds)")
                 break
             poll_count += 1
             elapsed_time = time.time() - start_time
@@ -704,8 +704,8 @@ def instruqt_reindex_with_endpoints():
         print(f"❌ Failed to delete properties index: {e}")
         return False
     
-    # Step 5: Reindex 10 documents from properties-original to properties
-    print("📋 Step 5: Reindexing 10 documents from properties-original to properties...")
+    # Step 5: Reindex 10 documents from original-properties to properties
+    print("📋 Step 5: Reindexing 10 documents from original-properties to properties...")
     try:
         # First recreate the properties index
         mapping = load_index_mapping(PROPERTIES_INDEX_MAPPING_INSTRUQT_FILE)
@@ -716,7 +716,7 @@ def instruqt_reindex_with_endpoints():
         reindex_response = es.reindex(
             body={
                 "source": {
-                    "index": "properties-original",
+                    "index": "original-properties",
                     "size": 10
                 },
                 "dest": {
