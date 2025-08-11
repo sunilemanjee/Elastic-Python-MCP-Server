@@ -27,7 +27,7 @@
       },
       "body_content_e5": {
         "type": "semantic_text",
-        "inference_id": ".multilingual-e5-small-elasticsearch",
+        "inference_id": "my-e5-endpoint",
         "model_settings": {
           "task_type": "text_embedding",
           "dimensions": 384,
