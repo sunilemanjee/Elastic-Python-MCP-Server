@@ -102,8 +102,7 @@ def create_elasticsearch_mcp_server(config: ElasticsearchConfig) -> FastMCP:
     mcp = FastMCP(
         name="elasticsearch-mcp-server",
         port=port,
-        host=host,
-        on_duplicate_tools="error"
+        host=host
     )
 
     # Create a background task for checking inference endpoints
