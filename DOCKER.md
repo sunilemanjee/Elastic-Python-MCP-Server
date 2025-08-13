@@ -77,7 +77,7 @@ docker-compose down
 Check if the server is running:
 
 ```bash
-curl http://localhost:8001/sse
+curl http://localhost:8001/mcp
 ```
 
 View logs:
@@ -255,13 +255,13 @@ spec:
               key: google-maps-key
         livenessProbe:
           httpGet:
-            path: /sse
+            path: /mcp
             port: 8001
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /sse
+            path: /mcp
             port: 8001
           initialDelaySeconds: 5
           periodSeconds: 5
@@ -298,7 +298,7 @@ docker-compose config
 ### Health check failures
 ```bash
 # Check if the server is responding
-curl -v http://localhost:8001/sse
+curl -v http://localhost:8001/mcp
 
 # Check container health
 docker ps --format "table {{.Names}}\t{{.Status}}"

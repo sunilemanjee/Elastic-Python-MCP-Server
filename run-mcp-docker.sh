@@ -56,7 +56,7 @@ echo -e "${GREEN}Building and starting the MCP server...${NC}"
 docker-compose up --build -d
 
 echo -e "${GREEN}MCP server is starting up...${NC}"
-echo "Server will be available at: http://localhost:8001/sse"
+echo "Server will be available at: http://localhost:8001/mcp"
 echo ""
 echo "To view logs: docker-compose logs -f"
 echo "To stop: ./stop-mcp-docker.sh or docker-compose down"

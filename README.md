@@ -196,7 +196,7 @@ source env_config.sh
 
 The server will start on port 8001 by default. You can verify it's running by checking:
 ```bash
-curl -v http://localhost:8001/sse
+curl -v http://localhost:8001/mcp
 ```
 
 ## API Endpoints

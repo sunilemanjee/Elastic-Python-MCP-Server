@@ -454,8 +454,8 @@ def main():
     
     server = create_elasticsearch_mcp_server(config)
     
-    # Run the server using FastMCP's built-in SSE support
-    server.run(transport="sse")
+    # Run the server using FastMCP's streamable-http transport (replaces deprecated SSE)
+    server.run(transport="streamable-http")
 
 if __name__ == "__main__":
     main() 

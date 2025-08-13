@@ -28,7 +28,7 @@ EXPOSE 8001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8001/sse || exit 1
+    CMD curl -f http://localhost:8001/mcp || exit 1
 
 # Default command
 CMD ["python", "elastic_mcp_server.py"] 
