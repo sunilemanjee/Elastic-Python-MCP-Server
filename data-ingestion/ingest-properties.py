@@ -667,7 +667,7 @@ def instruqt_reindex_with_endpoints():
             time.sleep(5)
             
     except Exception as e:
-        print(f"❌ Failed to reindex properties to properties-original: {e}")
+        print(f"❌ Failed to reindex properties to original-properties: {e}")
         return False
     
     # Step 2: Delete properties index
@@ -712,12 +712,13 @@ def instruqt_reindex_with_endpoints():
         es.indices.create(index="properties", body=mapping)
         print("✅ Properties index recreated with Instruqt mapping")
         
-        # Now reindex 10 documents
+        # Now reindex documents from original-properties to properties
+        reindex_size = 10
         reindex_response = es.reindex(
             body={
                 "source": {
                     "index": "original-properties",
-                    "size": 10
+                    "size": reindex_size
                 },
                 "dest": {
                     "index": "properties"
@@ -736,7 +737,9 @@ def instruqt_reindex_with_endpoints():
             task_status = es.tasks.get(task_id=task_id)
             if task_status['completed']:
                 elapsed_time = time.time() - start_time
-                print(f"✅ Reindex of 10 documents completed (took {elapsed_time:.1f} seconds)")
+                # Get the actual number of documents in the target index
+                actual_count = es.count(index="properties")['count']
+                print(f"✅ Reindex completed: {actual_count} documents in properties index (took {elapsed_time:.1f} seconds)")
                 break
             poll_count += 1
             elapsed_time = time.time() - start_time
