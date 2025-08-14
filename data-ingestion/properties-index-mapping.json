@@ -1,4 +1,23 @@
 {
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "my_analyzer": {
+          "tokenizer": "whitespace",
+          "filter": [
+            "synonyms_filter"
+          ]
+        }
+      },
+      "filter": {
+        "synonyms_filter": {
+          "type": "synonym",
+          "synonyms_set": "property-details",
+          "updateable": true
+        }
+      }
+    }
+  },
   "mappings": {
     "dynamic": "false",
     "properties": {
@@ -10,6 +29,7 @@
       },
       "body_content": {
         "type": "text",
+        "search_analyzer": "my_analyzer",
         "copy_to": [
           "body_content_elser",
           "body_content_e5"
@@ -101,10 +121,12 @@
         "type": "float"
       },
       "property-description": {
-        "type": "text"
+        "type": "text",
+        "search_analyzer": "my_analyzer"
       },
       "property-features": {
-        "type": "text"
+        "type": "text",
+        "search_analyzer": "my_analyzer"
       },
       "property-status": {
         "type": "keyword"

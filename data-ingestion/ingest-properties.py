@@ -634,6 +634,18 @@ def instruqt_reindex_with_endpoints():
     """Perform reindexing operation for Instruqt with endpoints"""
     print("🎯 Running Instruqt reindex with endpoints operation...")
     
+    # Step 0: Delete original-properties index if it exists
+    print("🗑️ Step 0: Deleting original-properties index if it exists...")
+    try:
+        if es.indices.exists(index="original-properties"):
+            es.indices.delete(index="original-properties")
+            print("✅ Original-properties index deleted")
+        else:
+            print("⚠️ Original-properties index does not exist, skipping deletion")
+    except Exception as e:
+        print(f"❌ Failed to delete original-properties index: {e}")
+        return False
+    
     # Step 1: Reindex properties to original-properties
     print("📋 Step 1: Reindexing properties to original-properties...")
     try:
