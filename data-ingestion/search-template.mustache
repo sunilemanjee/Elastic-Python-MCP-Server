@@ -5,9 +5,8 @@
     "retriever": {
         "standard": {
             "query": {
-                "semantic": {
-                    "field": "body_content_elser",
-                    "query": "{{query}}"
+                "match": {
+                   "body_content_elser": "{{query}}"
                 }
             },
             "filter": {
