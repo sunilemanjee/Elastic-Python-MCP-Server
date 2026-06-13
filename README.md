@@ -1,6 +1,6 @@
 # Elasticsearch MCP Server
 
-This is a Python-based MCP (Model Control Protocol) server that provides an interface for searching and analyzing property data using Elasticsearch. The server was converted from a Jupyter notebook to a standalone Python script.
+This is a Python-based MCP (Model Control Protocol) server that provides an interface for searching and analyzing real estate property data using Elasticsearch. The server was converted from a Jupyter notebook to a standalone Python script.
 
 Watch a demo of the property search system in action:
 
@@ -8,7 +8,7 @@ https://github.com/user-attachments/assets/df498631-fb16-4ba5-b1fd-c14670213d73
 
 ## Features
 
-- **Property Search**: Search for properties using various criteria including:
+- **Property Search**: Search for real estate properties using various criteria including:
   - Location (with geocoding support)
   - Price range
   - Number of bedrooms/bathrooms
