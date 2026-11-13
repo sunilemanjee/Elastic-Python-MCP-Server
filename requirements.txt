@@ -1,3 +1,6 @@
 elasticsearch==9.1.0
 requests==2.32.4
 mcp==1.12.4
+# mcp 1.12.4 imports pydantic._internal._typing_extra.eval_type_backport,
+# which was removed in pydantic 2.12 (2025-10-07). Pin until mcp is upgraded.
+pydantic<2.12
